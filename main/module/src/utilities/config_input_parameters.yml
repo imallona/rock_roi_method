@@ -1,0 +1,57 @@
+
+# input file paths
+input_bam_file_paths: 
+  - ../data/tso_alien.bam
+  - ../data/wta_alien.bam
+  # - ../data/rockroi_tso_downsampled.bam
+  # - ../data/rockroi_wta_downsampled.bam
+  # - ../data/unmod_tso_downsampled.bam
+  # - ../data/unmod_wta_downsampled.bam
+unique_cb_bamfile_list:               # for valid cell bar codes extraction
+  - ../data/wta_alien.bam             # list of bam files from which unique CB tags are to be extracted
+  # - ../data/rockroi_wta_downsampled.bam
+  # - ../data/unmod_wta_downsampled.bam
+gtf_file: ../data/combined_correct.gtf
+featureCounts_path: /home/imallona/soft/subread-2.0.4-source/bin/featureCounts
+
+# input parameters
+linker_pattern_for_seq_logo: ^([A-Z]{9})(AATG[A-Z]{9}CCAC) # tso pattern to get tso tail seq logo
+linker_pattern_list:                  # list of linkers to be matched with alignment. If no match then CB tag is recovered where possible.
+  - ^([A-Z]{9})(AATG[A-Z]{9}CCAC)     # tso linkers
+  - ^(A|GT|TCA)?([A-Z]{9})(GTGA[A-Z]{9}GACA)  # wta linkers
+seq_logo_filename: tso_seq_logo.png
+cb1_len: 9                            # length of first part of CB tag
+cb2_len: 9                            # length of second part of CB tag
+cb3_len: 9                            # length of third part of CB tag
+linker_left_len: 4                    # length of linker on left
+linker_right_len: 4                   # length of linker on right
+umi_len: 8                            # length of UMI in sS tag
+chunk_genomic_area: 1000              # number of base pairs to be processed by each process in multiprocessing
+
+# NOTE: number of rg tag names must be equal to the number of input bam files and in the order of input bam files
+rg_tag_names:
+  - alien_tso
+  - alien_wta 
+
+chromosomes:                          # chromosomes to be processed
+  - alien_egfp_WPRE
+  - alien_tdtomato_WPRE
+
+subset_gtf: 1                         # subset gtf file by pattern (1: yes, 0: no)
+subset_gtf_output_file: alien.gtf     # output file name of subset of gtf file
+subset_gtf_pattern: 'alien'           # filter gtf file by this pattern if subset_gtf = 1
+write_final_bam_to_csv: 1             # write final merged bam file to a csv file(1: yes, 0: no)
+write_final_bam_header_to_txt: 1      # write final merged bam header to text file (1: yes, 0: no)
+nProcessors: 4                        # for multiprocessing
+nthreads: 4                           # for featureCounts
+
+
+# output file names and paths
+output_folder: ../logs/
+# output_folder: ../logs_mod/
+# output_folder: ../logs_unmod/
+final_merged_file: merged.bam
+featureCounts_output_file: alien_only # NOTE: do not add extension
+log_file: log.txt
+error_log: error_log.txt
+
