@@ -8,7 +8,7 @@ RUN apt-get update && \
     apt install -y python3-pip python-is-python3 samtools wget less
      
 COPY ./main/module.tar.gz /home/rock/
-COPY ./data/alien_*bam /home/rock/
+COPY ./data/simulate_run.sh /home/rock/
 
 ## rockandroi python module
 
@@ -29,7 +29,6 @@ RUN mkdir -p /home/rock/soft/star && \
     cd STAR-2.7.10b/source && \
     make
 
-     
 # subread
 
 RUN mkdir -p /home/rock/soft/subread && \
@@ -40,12 +39,16 @@ RUN mkdir -p /home/rock/soft/subread && \
     make -f Makefile.Linux && \
     ln -s  /home/rock/soft/subread/subread-2.0.6-source/bin/featureCounts /usr/local/bin/featureCounts
 
+RUN chown -R rock:rock /home/rock
+
 USER rock
 
 ENV PATH=/home/rock/soft/star/STAR-2.7.10b/source:$PATH
 RUN echo "export PATH=$PATH" >> ~/.bashrc
 
-RUN echo $PATH
-# RUN STAR --version
+ ## showcase the method with some simulated data
+RUN cd /home/rock && \
+    chmod +x simulate_run.sh && \
+    bash simulate_run.sh
 
 

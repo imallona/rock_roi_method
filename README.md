@@ -9,7 +9,17 @@ We asume a GNU/Linux system. We haven't tested it on Mac and it won't run on Win
 
 We provide a Dockerfile to define a suitable GNU/Linux environment to run our method.
 
-### STAR (STARsolo)
+### Using docker
+
+Within the root of this directory (so the `Dockerfile` is there):
+
+```
+docker build . -t rock && docker run -it --entrypoint /bin/bash rock
+```
+
+### Manually
+
+#### STAR (STARsolo)
 
 ```
 mkdir -p ~/soft/star
@@ -28,11 +38,25 @@ export PATH="$HOME"/soft/star/STAR-2.7.10b/source:$PATH
 
 ```
 
-### Subread
+#### Subread
 
 ```
-to-do
+mkdir -p ~/soft/soft/subread
+cd $_
+wget 'https://sourceforge.net/projects/subread/files/subread-2.0.6/subread-2.0.6-source.tar.gz/download' 
+tar xzvf download 
+cd subread-2.0.6-source/src 
+make -f Makefile.Linux 
+
+## assuming ~/.local/bin/ is part of the $PATH
+ln -s  ~/soft/soft/subread/subread-2.0.6-source/bin/featureCounts ~/.local/bin/featureCounts
 ```
+
+## Usage example
+
+We provide (within the `Dockerfile`) a data simulation plus analysis workflow. In brief, we aim to quantify in 2 cells a set of features: one is `offtarget` and captured by the WTA assay; and others are (multioverlapping, multimapper) `ontarget` readouts captured by the TSO assay.
+
+The rationale behind is: lorem ipsum.
 
 ## License
 
