@@ -59,6 +59,11 @@ ln -s  ~/soft/soft/subread/subread-2.0.6-source/bin/featureCounts ~/.local/bin/f
 
 Lorem ipsum
 
+```
+cd main
+snakemake -s rock_roi_method_main.snmk --cores 1 --configfile config.yaml
+```
+
 ### Simulation
 
 We provide (within the `Dockerfile`) a data simulation plus analysis workflow. In brief, we aim to quantify in 2 cells a set of features: one is `offtarget` and captured by the WTA assay; and others are (multioverlapping, multimapper) `ontarget` readouts captured by the TSO assay.

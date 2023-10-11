@@ -1,1 +1,2 @@
-single_experiment r1.fq.gz r2.fq.gz BD_CLS1.txt BD_CLS2.txt BD_CLS3.txt
+name	cb_umi_fastq	cdna_fastq	whitelist	expected_number_cells
+simulated	r1.fq.gz	r2.fq.gz	90x3	10000
