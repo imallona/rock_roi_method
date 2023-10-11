@@ -1,0 +1,67 @@
+#!/usr/bin/env snakemake -s
+##
+## Snakefile to process rock/roi data
+##
+## Started 11th Oct 2023
+##
+## Izaskun Mallona
+## GPLv3
+
+# import os
+import os.path as op
+from glob import glob
+import pandas as pd
+import re
+
+configfile: "config.yaml"
+
+samples = pd.read_table(config["metadata"])
+
+print(samples)
+
+
+# index start
+
+rule index:
+        gtf = config['gtf'],
+        genome = config['genome']
+    output:
+        index_path =  op.join('..' , 'data', 'index',
+    threads:
+        NTHREADS
+    params:
+       foo = 'empty'
+    log:
+        op.join('..', 'data', 'index', 'indexing.log')
+    shell:
+        """
+    mkdir -p {params.processing_path}
+    cd {params.processing_path}
+
+    ({SALMON} alevin \
+    -l ISR \
+    -1 {params.cb} \
+    -2 {params.r2} \
+    --end 5 --umiLength 8 --barcodeLength 12  \
+    --dumpFeatures \
+    -i {params.salmon_idx} \
+    -p {threads} -o {params.processing_path} \
+    --tgMap {input.tgmap} ) 2> {log}
+
+    touch -c {output.alevin}
+    touch {output.flag}
+        """
+
+# index end
+
+# align and count wta start
+
+# align and count wta end
+
+# align tso start
+
+# align tso end
+
+# count tso start
+
+# count tso end

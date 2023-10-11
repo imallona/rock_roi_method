@@ -5,20 +5,18 @@ LABEL maintainer="izaskun.mallona@gmail.com"
 RUN useradd -m rock
 
 RUN apt-get update && \
-    apt install -y python3-pip python-is-python3 samtools wget less
-     
-COPY ./main/module.tar.gz /home/rock/
+    apt install -y python3-pip python-is-python3 samtools wget less git
+
+WORKDIR /home/rock
+COPY ./main/module module/
 COPY ./data/simulate_run.sh /home/rock/
 
 ## rockandroi python module
 
 RUN cd /home/rock/ && \
-    tar xzvf module.tar.gz && \
     cd module && \
     pip install -r rock_n_roi_requirements.txt && \
-    mkdir -p data && \
-    ln -s /home/rock/alien_wta.bam ./data/wta_alien.bam && \
-    ln -s /home/rock/alien_tso.bam ./data/tso_alien.bam
+    mkdir -p data
 
 # STAR
 

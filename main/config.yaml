@@ -1,0 +1,13 @@
+simulate: False
+
+gtf: ../data/genome.gtf
+genome: ../data/genome.fa
+
+use_conda_R: False
+Rbin: R
+
+fastq_path: ../data
+metadata: ../data/metadata.txt
+
+nthreads: 20
+per_task_max_nthreads: 5

@@ -1,0 +1,1 @@
+single_experiment r1.fq.gz r2.fq.gz BD_CLS1.txt BD_CLS2.txt BD_CLS3.txt

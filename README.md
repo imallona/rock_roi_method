@@ -9,6 +9,7 @@ We asume a GNU/Linux system. We haven't tested it on Mac and it won't run on Win
 
 We provide a Dockerfile to define a suitable GNU/Linux environment to run our method.
 
+
 ### Using docker
 
 Within the root of this directory (so the `Dockerfile` is there):
@@ -52,7 +53,13 @@ make -f Makefile.Linux
 ln -s  ~/soft/soft/subread/subread-2.0.6-source/bin/featureCounts ~/.local/bin/featureCounts
 ```
 
-## Usage example
+## Usage
+
+### Snakemake
+
+Lorem ipsum
+
+### Simulation
 
 We provide (within the `Dockerfile`) a data simulation plus analysis workflow. In brief, we aim to quantify in 2 cells a set of features: one is `offtarget` and captured by the WTA assay; and others are (multioverlapping, multimapper) `ontarget` readouts captured by the TSO assay.
 
