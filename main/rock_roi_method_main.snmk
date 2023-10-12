@@ -15,22 +15,60 @@ import re
 
 configfile: "config.yaml"
 
-samples = pd.read_table(config["metadata"])
+# samples = pd.read_table(config["metadata"])
 
-print(samples.head())
-print(samples.cb_umi_fastq.tolist())
+# print(samples.head())
+# print(samples.cb_umi_fastq.tolist())
+print(config)
+print(config.keys())
+print(config['samples'])
+
+def get_sample_names():
+    return([x['name'] for x in config['samples']])
+
+def get_r1_by_name(name):
+    for i in range(len(config['samples'])):
+        if config['samples'][i]['name'] == name:
+             return(config['samples'][i]['uses']['cb_umi_fq'])
+
+def get_r2_by_name(name):
+    for i in range(len(config['samples'])):
+        if config['samples'][i]['name'] == name:
+             return(config['samples'][i]['uses']['cdna_fq'])
+
+def get_expected_cells_by_name(name):
+    for i in range(len(config['samples'])):
+        if config['samples'][i]['name'] == name:
+             return(config['samples'][i]['uses']['expected_cells'])
+
+## old bd whitelists
+def get_90x3_samples():
+   matching = []
+   for i in range(len(config['samples'])):
+        if config['samples'][i]['uses']['whitelist'] == '90x3':
+             matching.append(config['samples'][i]['name'])
+   return(matching)
+     
+# def get_whitelist(name):
+#     for i in range(len(config['samples'])):
+#         if config['samples'][i]['name'] == name:
+#                 if config['samples'][i]['uses']['whitelist'] == '90x3':
+#                         return([op.join('..', 'data', 'whitelists', 'BD_CLS' + x + '.txt')
+#                                 for x in ['1','2','3']])
 
 
-if not set(['name','cb_umi_fastq', 'cdna_fastq']).issubset(samples.columns):
-	sys.exit("".join(['The provided metadata file ', config["metadata"], ' is malformed.']))
+# print('test')
+# print(get_r1_by_name('simulated'))
+        
 
 
-# index start
+# if not set(['name','cb_umi_fastq', 'cdna_fastq']).issubset(samples.columns):
+# 	sys.exit("".join(['The provided metadata file ', config["metadata"], ' is malformed.']))
 
 rule all:
     input:
-        op.join('..', 'data', 'r1.fq.gz'),
-        op.join('..' , 'data', 'index', 'SAindex')
+        expand(op.join('..', 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+               sample = get_90x3_samples())
     
 rule index:
     input:
@@ -148,11 +186,13 @@ ontarget\tERCC\texon\t1030\t1090\t.\t+\t.\tgene_id "ontarget_2"; transcript_id "
 
 rule simulate_fastqs:
     output:
-        r1 = op.join('..', 'data', 'r1.fq.gz'),
-        r2 = op.join('..', 'data', 'r2.fq.gz')
+        r1 = op.join('..', 'data', '{sample}', 'r1.fq.gz'),
+        r2 = op.join('..', 'data', '{sample}', 'r2.fq.gz')
+    params:
+        path = op.join('..', 'data', '{sample}')
     shell:
         """
-        cd ../data
+        cd {params.path}
 seq 1 100 | awk ' {{print "@"$0"\\nTACTGGACTCGCAACGTGGGTCCATCAGTTGTCCGTATACCAAGACGTCTAAGGGCGGTGTACACCCTTTTGAGCAATGATTGCACAACCTGCGATCACCTTATACAGAATTATCAATCAAGCTCCCCGAGGAGCGGACTTGTAAGGACCGCCGCTTTCGCTCGGGTCTGCGG\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c > r1.fq.gz
 
 seq 1 100 | awk ' {{print "@"$0"\\nCTTGTACTAGTGATGTTCTCCAGACAGGCTACAGATTTGATGGTTTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c > r2.fq.gz
@@ -170,44 +210,73 @@ seq 201 300 | awk ' {{print "@"$0"\\nATTCCAAACTTAGCTTCAGTTATAAATTCCCCTCCCATGATTG
 seq 201 300 | awk ' {{print "@"$0"\\nCTTGTACTAAATGTGTTCTCCACCACGGCTACAGATTTGATGGTTTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> r2.fq.gz
         """
 
-# def return_whitelist:
-#     if (
-# ## mind the whitelists (CBs) are provided by the user
-# rule align_wta:
-#     input:
-#         r1 = expand(op.join('..', 'data', '{r1}'), sample = samples.cb_umi_fastq.values.tolist()),
-#         r2 = expand(op.join('..', 'data', '{r2}'), sample = samples.cdna_fastq.values.tolist()),
-#         cb_whitelist_1 = '',
-#         cb_whitelist_2 = '',
-#         cb_whitelist_3 = '',
-#         index = ''
-#     output:
-#         ''
-#     params:
-#         STAR = config['STAR'],
-#         threads = config['nthreads']
-#     shell:
-#         """
-#    {params.STAR} --runThreadN $NTHREADS \
-#      --genomeDir genome \
-#      --readFilesCommand zcat \
-#      --outFileNamePrefix mapping_wta/ \
-#      --readFilesIn  {input.r1} {input.r2}  \
-#      --soloType CB_UMI_Complex \
-#      --soloAdapterSequence GTGANNNNNNNNNGACA \
-#      --soloCBposition 2_-9_2_-1 2_4_2_12 2_17_2_25 \
-#      --soloUMIposition 3_10_3_17 \
-#      --soloCBwhitelist BD_CLS1.txt BD_CLS2.txt BD_CLS3.txt \
-#      --soloCBmatchWLtype 1MM \
-#      --soloCellFilter None \
-#      --soloCellReadStats Standard \
-#      --sjdbOverhang 100 \
-#      --outSAMattributes sS sM CB UB CR CY UR UY \
-#      --outSAMtype BAM SortedByCoordinate \
-#      --quantMode GeneCounts \
-#      --soloUMIlen 8 \
-#      --sjdbGTFfile genome.gtf
-#         """
+
+rule retrieve_whitelist:
+    output:
+        op.join('..', 'data', 'whitelists', 'BD_CLS1.txt'),
+        op.join('..', 'data', 'whitelists', 'BD_CLS2.txt'),
+        op.join('..', 'data', 'whitelists', 'BD_CLS3.txt')
+    params:
+        path = op.join('..', 'data', 'whitelists')
+    shell:
+        """
+        mkdir -p {params.path}
+        cd {params.path}
+        wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS1.txt
+        wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS2.txt
+        wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS3.txt
+        """
+
+# def return_fastqs_from_sample (sample_id):
+#         return([samples[samples.name == sample_id].cb_umi_fastq.values.tolist(),
+#                 samples[samples.name == sample_id].cdna_fastq.values.tolist()])
+    
+## mind the whitelists (CBs) are provided by the user
+
+rule align_wta_90x3:
+    input:
+        r1 = op.join('..', 'data', "{sample}", 'r1.fq.gz'),
+        r2 = op.join('..', 'data', "{sample}", 'r2.fq.gz'),
+        index_flag = op.join('..' , 'data', 'index', 'SAindex'),
+        gtf = config['gtf'],
+        cb1 = op.join('..', 'data', 'whitelists', 'BD_CLS1.txt'),
+        cb2 = op.join('..', 'data', 'whitelists', 'BD_CLS2.txt'),
+        cb3 = op.join('..', 'data', 'whitelists', 'BD_CLS3.txt')
+    output:
+        bam = op.join('..', 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        tmp = temp(directory(op.join('..', 'tmp_align_wta_{sample}')))
+    params:
+        path = op.join('..', 'align_wta', "{sample}/"),
+        index_path = op.join('..' , 'data', 'index'),
+        STAR = config['STAR'],
+        threads = config['nthreads'],
+        num_cells = get_expected_cells_by_name("{sample}")
+    shell:
+        """
+   rm -rf {output.tmp}
+   mkdir -p {params.path} 
+        
+   {params.STAR} --runThreadN {params.threads}\
+     --genomeDir {params.index_path} \
+     --readFilesCommand zcat \
+     --outFileNamePrefix {params.path} \
+     --readFilesIn  {input.r1} {input.r2}  \
+     --soloType CB_UMI_Complex \
+     --soloAdapterSequence GTGANNNNNNNNNGACA \
+     --soloCBposition 2_-9_2_-1 2_4_2_12 2_17_2_25 \
+     --soloUMIposition 3_10_3_17 \
+     --soloCBwhitelist {input.cb1} {input.cb2} {input.cb3} \
+     --soloCBmatchWLtype 1MM \
+     --soloCellFilter EmptyDrops_CR 10000 0.99 10 45000 90000 500 0.01 20000 0.05 {params.num_cells} \
+     --outSAMattributes NH HI AS nM NM MD jM jI MC ch CB UB gx gn sS CR CY UR UY\
+     --soloCellReadStats Standard \
+     --sjdbOverhang 100 \
+     --outSAMtype BAM SortedByCoordinate \
+     --quantMode GeneCounts \
+     --soloUMIlen 8 \
+     --sjdbGTFfile {input.gtf} \
+     --outTmpDir {output.tmp}
+        """
         
     
 
