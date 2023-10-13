@@ -60,26 +60,10 @@ cb2s = ['TACAGGATA','CACCAGGTA','TGTGAAGAA','GATTCATCA','CACCCAAAG','CACAAAGGC',
 cb3s = ['AAGCCTTCT','ATCATTCTG','CACAAGTAT','ACACCTTAG','GAACGACAA','AGTCTGTAC','AAATTACAG', 'AAAAAAAAA']
 umis = ['AACCTTGG', 'CCGGTTAA', 'TTGGCCAA', 'GACATAGG']
 
-# def generate_cells(cb1s, cb2s, cb3s):
-#     tr = []
-#     for cb1 in cb1s:
-#         for cb2 in cb2s:
-#             for cb3 in cb3s:
-#                 tr.append('part_' + cb1 + '_' + cb2 + '_' + cb3 + 'r1.fq.gz')
-#     return(tr)
-
-# print('hello')
-
-# print(generate_cells(cb1s, cb2s, cb3s))
-
 rule all:
     input:
-        # expand(op.join('..', 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        #        sample = get_96x3_samples())#,
         expand(op.join('..', 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
                sample = 'simulated'),
-        # op.join('..', 'data', 'simulated', 'part_GTCGCTATA_TACAGGATA_AAGCCTTCT_r1.fq.gz')
-        # expand(op.join('..', 'data', 'simulated', "{cell}"), cell = generate_cells(cb1s, cb2s, cb3s))
     
 rule index:
     input:
@@ -195,15 +179,6 @@ ontarget\tERCC\texon\t100\t800\t.\t+\t.\tgene_id "ontarget_1b"; transcript_id "o
 ontarget\tERCC\texon\t1030\t1090\t.\t+\t.\tgene_id "ontarget_2"; transcript_id "ontarget_2";' > {output}
         """
 
-
-# cb:         CTTGTACTAAATGTGTTCTCCACCACGGCTACAGA
-# cb chunks:  CTTGTACTA AATG TGTTCTCCA CCAC GGCTACAGA
-# umi:        CCCCCCCC
-
-
-                
-
-
 rule simulate_fastqs:
     input:
         part_r1 = expand(op.join('..', 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz'),
@@ -231,27 +206,18 @@ seq 1 100 | awk ' {{print "@extra"$0"\\nCTTGTACTAGTGATGTTCTCCAGACAGGCTACAGATTTGA
 
 cat {input.part_r1} {output.r1_extra} > {output.r1}
 cat {input.part_r2} {output.r2_extra} > {output.r2}
-
-
-
       """
        
 rule simulate_fastqs_from_a_cell:
     output:
         part_r1 =  temp(op.join('..', 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz')),
         part_r2 =  temp(op.join('..', 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'))
-        # r1 = op.join('..', 'data', '{sample}', 'r1.fq.gz'),
-        # r2 = op.join('..', 'data', '{sample}', 'r2.fq.gz')
     params:
         path = op.join('..', 'data', '{sample}'),
         tso_fix1 = "AATG",
         tso_fix2 = "CCAC",
         wta_fix1 = "GTGA",
         wta_fix2 = "GACA",
-        # umi = "CCCCCCCC"
-        # cb1 = "CTTGTACTA",
-        # cb1 = "TGTTCTCCA",
-        # cb3 = "GGCTACAGA",
     threads:
         config['nthreads']
     shell:
@@ -273,7 +239,6 @@ seq 11 20 | awk  ' {{print "@tso"$0"_{wildcards.cb1}{wildcards.cb1}{wildcards.cb
 seq 21 30 | awk ' {{print "@tso"$0"_{wildcards.cb1}{wildcards.cb1}{wildcards.cb3}{wildcards.umi}\\nATTCCAAACTTAGCTTCAGTTATAAATTCCCCTCCCATGATTGGGATTTTATAAACTTTTCTTCCATATAATTCATCTTTCTTCTCATAACCGTCTCCGAAAAACTTCAACTTAAATCCAACCTTTAACTGCTCATCA\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r1}
 
 seq 21 30 | awk ' {{print "@tso"$0"_{wildcards.cb1}{wildcards.cb1}{wildcards.cb3}{wildcards.umi}\\nG{wildcards.cb1}{params.tso_fix1}{wildcards.cb2}{params.tso_fix2}{wildcards.cb3}{wildcards.umi}TTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r2}
-
       """
 
 
@@ -292,13 +257,6 @@ rule retrieve_whitelist:
         wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS2.txt
         wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS3.txt
         """
-
-# def return_fastqs_from_sample (sample_id):
-#         return([samples[samples.name == sample_id].cb_umi_fastq.values.tolist(),
-#                 samples[samples.name == sample_id].cdna_fastq.values.tolist()])
-    
-## mind the whitelists (CBs) are provided by the user
-
 
 rule align_wta_96x3:
     input:
@@ -326,14 +284,7 @@ rule align_wta_96x3:
         """
    rm -rf {params.tmp}
    mkdir -p {params.path} 
-        
-   ## --soloUMIposition 2_26_2_33 
-   ## 
 
-   ## --soloCellFilter TopCells {params.num_cells}
-
-# https://github.com/MarioniLab/DropletUtils/pull/64/commits/5a0b6c2f91b4767b92e3fb0894a2c05c9eaa22d4
-  
    {params.STAR} --runThreadN {params.threads}\
      --genomeDir {params.index_path} \
      --readFilesCommand zcat \
@@ -359,14 +310,6 @@ rule align_wta_96x3:
     rm -rf {params.tmp}
         """
 
-"""
-STAR --runThreadN 5 --runMode soloCellFiltering ../align_wta/simulated/Solo.out//Gene/raw/ ~/tmp/foo \
-    --soloType CB_UMI_Complex --soloAdapterSequence GTGANNNNNNNNNGACA \
-    --soloCBposition 2_-9_2_-1 2_4_2_12 2_17_2_25 --soloUMIposition 3_10_3_17 \
-    --soloCBwhitelist ../data/whitelists/BD_CLS1.txt \
-    ../data/whitelists/BD_CLS2.txt ../data/whitelists/BD_CLS3.txt --soloCBmatchWLtype 1MM -\
-    -soloCellFilter CellRanger2.2
-"""
         
 rule generate_tso_whitelist_from_wta_filtered:
     input:
@@ -382,17 +325,13 @@ rule generate_tso_whitelist_from_wta_filtered:
         awk -F "_" '{{print $1"AATG"$2"CCAC"$3}}' {input.filtered_barcodes} > {output.tso_whitelist}
         """
         
-        
-## beware we might be downsizing the reported cells to the user inputted expected cells
+
 rule align_tso_96x3:
     input:
         r1 = op.join('..', 'data', "{sample}", 'r1.fq.gz'),
         r2 = op.join('..', 'data', "{sample}", 'r2.fq.gz'),
         index_flag = op.join('..' , 'data', 'index', 'SAindex'),
         gtf = config['gtf'],
-        # cb1 = op.join('..', 'data', 'whitelists', 'BD_CLS1.txt'),
-        # cb2 = op.join('..', 'data', 'whitelists', 'BD_CLS2.txt'),
-        # cb3 = op.join('..', 'data', 'whitelists', 'BD_CLS3.txt'),
         tso_whitelist = op.join('..', 'data', '{sample}', 'tso_whitelist.txt'),
         filtered_barcodes = op.join('..', 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                     'filtered', 'barcodes.tsv')
@@ -403,35 +342,13 @@ rule align_tso_96x3:
         index_path = op.join('..' , 'data', 'index'),
         STAR = config['STAR'],
         threads = 5, #config['nthreads'],
-        # num_cells = get_expected_cells_by_name("{sample}"),
         tmp = op.join('..', 'tmp_align_tso_{sample}'),
         maxmem = config['per_task_max_mem']
     shell:
         """
    rm -rf {params.tmp}
    mkdir -p {params.path} 
-        
-   # {params.STAR} --runThreadN {params.threads}\
-   #   --genomeDir {params.index_path} \
-   #   --readFilesCommand zcat \
-   #   --outFileNamePrefix {params.path} \
-   #   --readFilesIn  {input.r1} {input.r2}  \
-   #   --soloType CB_UMI_Simple \
-   #   --soloCBstart 1 \
-   #   --soloCBwhitelist {input.tso_whitelist} \
-   #   --soloCBlen 35 \
-   #   --soloUMIstart 36 \
-   #   --soloUMIlen 8 \
-   #   --soloCellFilter TopCells 99999 \
-   #   --outSAMattributes NH HI AS nM NM MD jM jI MC ch CB UB gx gn sS CR CY UR UY\
-   #   --soloCellReadStats Standard \
-   #   --sjdbOverhang 100 \
-   #   --outSAMtype BAM SortedByCoordinate \
-   #   --quantMode GeneCounts \
-   #   --sjdbGTFfile {input.gtf} \
-   #   --outTmpDir {params.tmp}
 
-   ## umi needs to be TTTGATGG
    {params.STAR} --runThreadN {params.threads}\
      --genomeDir {params.index_path} \
      --readFilesCommand zcat \
@@ -456,18 +373,3 @@ rule align_tso_96x3:
 
     rm -rf {params.tmp}
         """
-    
-
-# # index end
-
-# # align and count wta start
-
-# # align and count wta end
-
-# # align tso start
-
-# # align tso end
-
-# # count tso start
-
-# # count tso end

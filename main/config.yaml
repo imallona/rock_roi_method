@@ -14,10 +14,10 @@ samples:
       cb_umi_fq: ../data/simulated/r1.fq.gz
       cdna_fq: ../data/simulated/r2.fq.gz
       whitelist: 96x3
-      expected_cells: 1
+      expected_cells: 500
   - name: simulated2
     uses:
       cb_umi_fq: ../data/simulated2/r1.fq.gz
       cdna_fq: ../data/simulated2/r2.fq.gz
       whitelist: 96x3
-      expected_cells: 2
+      expected_cells: 500
