@@ -9,14 +9,17 @@ RUN apt-get update && \
 
 WORKDIR /home/rock
 COPY ./main/module module/
-COPY ./data/simulate_run.sh /home/rock/
+COPY main/Snakefile main/Snakefile
+COPY main/config.yaml main/config.yaml
+COPY ./data/simulate_run.sh data/simulate_run.sh
 
 ## rockandroi python module
 
 RUN cd /home/rock/ && \
     cd module && \
     pip install -r rock_n_roi_requirements.txt && \
-    mkdir -p data
+    mkdir -p data && \
+    pip install snakemake pandas
 
 # STAR
 
@@ -45,7 +48,7 @@ ENV PATH=/home/rock/soft/star/STAR-2.7.10b/source:$PATH
 RUN echo "export PATH=$PATH" >> ~/.bashrc
 
  ## showcase the method with some simulated data
-RUN cd /home/rock && \
+RUN cd /home/rock/data && \
     chmod +x simulate_run.sh && \
     bash simulate_run.sh
 

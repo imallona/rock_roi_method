@@ -9,13 +9,26 @@ We asume a GNU/Linux system. We haven't tested it on Mac and it won't run on Win
 
 We provide a Dockerfile to define a suitable GNU/Linux environment to run our method.
 
-
-### Using docker
+### Using docker and no snakemake
 
 Within the root of this directory (so the `Dockerfile` is there):
 
 ```
 docker build . -t rock && docker run -it --entrypoint /bin/bash rock
+```
+
+## Using docker and snakemake
+
+Assuming a single-threaded execution:
+
+```
+docker build . -t rock && docker run -it --entrypoint /bin/bash rock
+
+## once inside the `rock` container
+
+cd main
+snakemake -p --cores 1 --configfile config.yaml
+
 ```
 
 ### Manually
@@ -25,7 +38,6 @@ docker build . -t rock && docker run -it --entrypoint /bin/bash rock
 ```
 mkdir -p ~/soft/star
 cd $_
-
 
 wget https://github.com/alexdobin/STAR/archive/2.7.10b.tar.gz
 tar -xzf 2.7.10b.tar.gz
@@ -55,14 +67,9 @@ ln -s  ~/soft/soft/subread/subread-2.0.6-source/bin/featureCounts ~/.local/bin/f
 
 ## Usage
 
-### Snakemake
+### Writing a config file for snakemake
 
 Lorem ipsum
-
-```
-cd main
-snakemake -s rock_roi_method_main.snmk --cores 1 --configfile config.yaml
-```
 
 ### Simulation
 

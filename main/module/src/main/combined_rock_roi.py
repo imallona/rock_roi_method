@@ -18,6 +18,12 @@ from utilities.seq_logo import get_seq_logo
 from utilities.alignments_multiprocessing import alignments_multiprocessing
 from utilities.seq_logo_multiprocessing import seq_logo_multiprocessing
 
+import argparse
+
+parser = argparse.ArgumentParser(description='')
+parser.add_argument('--config', metavar='config', type=str,
+                    help='full path to the config file')
+cmdargs = parser.parse_args()
 
 def main():
     try:            
@@ -27,7 +33,7 @@ def main():
         
         print('Setting up input and output parameters...')
 
-        config_path = './utilities/config_input_parameters.yml'
+        config_path = cmdargs.config #'./utilities/config_input_parameters.yml'
         with open(config_path) as cf_file:
             args = yaml.safe_load(cf_file.read())
 
