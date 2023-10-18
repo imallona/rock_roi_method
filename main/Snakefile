@@ -15,8 +15,6 @@ import re
 
 configfile: "config.yaml"
 
-print(config['samples'])
-
 if config['simulate']:
     config['gtf'] = op.join(config['working_dir'], 'data', 'genome.gtf')
     config['genome'] = op.join(config['working_dir'], 'data', 'genome.fa')
@@ -50,15 +48,13 @@ def get_expected_cells_by_name(name):
         if config['samples'][i]['name'] == name:
              return(config['samples'][i]['uses']['expected_cells'])
 
-# ## old bd whitelists
-# def get_96x3_samples():
-#    matching = []
-#    for i in range(len(config['samples'])):
-#         if config['samples'][i]['uses']['whitelist'] == '96x3':
-#              matching.append(config['samples'][i]['name'])
-#    return(matching)
+def get_barcode_whitelist_by_name(name):
+    for i in range(len(config['samples'])):
+        if config['samples'][i]['name'] == name:
+             return(config['samples'][i]['uses']['whitelist'])
 
 ## canonical CB 9-mers or just A{9}
+## (used for simulations)
 cb1s = ['GTCGCTATA','CTTGTACTA','CTTCACATA','ACACGCCGG','CGGTCCAGG','AATCGAATG','CCTAGTATA']
 cb2s = ['TACAGGATA','CACCAGGTA','TGTGAAGAA','GATTCATCA','CACCCAAAG','CACAAAGGC','GTGTGTCGA']
 cb3s = ['AAGCCTTCT','ATCATTCTG','CACAAGTAT','ACACCTTAG','GAACGACAA','AGTCTGTAC','AAATTACAG', 'AAAAAAAAA']
@@ -204,7 +200,6 @@ rule simulate_fastqs:
         """
 # cd {params.path}
 
-
 seq 1 100 | awk ' {{print "@extra"$0"\\nTACTGGACTCGCAACGTGGGTCCATCAGTTGTCCGTATACCAAGACGTCTAAGGGCGGTGTACACCCTTTTGAGCAATGATTGCACAACCTGCGATCACCTTATACAGAATTATCAATCAAGCTCCCCGAGGAGCGGACTTGTAAGGACCGCCGCTTTCGCTCGGGTCTGCGG\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c > {output.r1_extra}
 
 seq 1 100 | awk ' {{print "@extra"$0"\\nCTTGTACTAGTGATGTTCTCCAGACAGGCTACAGATTTGATGGTTTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c > {output.r2_extra}
@@ -246,32 +241,63 @@ seq 21 30 | awk ' {{print "@tso"$0"_{wildcards.cb1}{wildcards.cb1}{wildcards.cb3
 seq 21 30 | awk ' {{print "@tso"$0"_{wildcards.cb1}{wildcards.cb1}{wildcards.cb3}{wildcards.umi}\\nG{wildcards.cb1}{params.tso_fix1}{wildcards.cb2}{params.tso_fix2}{wildcards.cb3}{wildcards.umi}TTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r2}
       """
 
+# rule retrieve_whitelist:
+#     output:
+#         op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS1.txt'),
+#         op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS2.txt'),
+#         op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS3.txt')
+#     params:
+#         path = op.join(config['working_dir'], 'data', 'whitelists')
+#     shell:
+#         """
+#         mkdir -p {params.path}
+#         cd {params.path}
+#         wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS1.txt
+#         wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS2.txt
+#         wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS3.txt
+#         """
 
-rule retrieve_whitelist:
+## bd offers a couple of sets of whitelists, so we fetch the right one according to the config.yaml file
+def symlink_whitelist(sample):
+    os.makedirs(op.join(config['working_dir'], 'align_wta'), exist_ok = True)
+                
+    if get_barcode_whitelist_by_name(name = sample) == '96x3':
+        for x in ['BD_CLS1.txt', 'BD_CLS2.txt', 'BD_CLS3.txt']:
+            try:
+                os.symlink(src = op.join(os.getcwd(), '..', 'data', 'whitelist_96x3', x),
+                           dst = op.join(config['working_dir'], 'align_wta', sample, 'whitelists', x))
+            except FileExistsError:
+                break
+    elif get_barcode_whitelist_by_name(name = sample) == '384x3':
+        for x in ['BD_CLS1.txt', 'BD_CLS2.txt', 'BD_CLS3.txt']:
+            try:
+                os.symlink(src = op.join(os.getcwd(), '..', 'data', 'whitelist_384x3', x),
+                           dst = op.join(config['working_dir'], 'align_wta', sample, 'whitelists', x))
+            except FileExistsError:
+                break
+
+rule prepare_whitelists:
+    input:
+        r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
+        r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz')
     output:
-        op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS1.txt'),
-        op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS2.txt'),
-        op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS3.txt')
-    params:
-        path = op.join(config['working_dir'], 'data', 'whitelists')
-    shell:
-        """
-        mkdir -p {params.path}
-        cd {params.path}
-        wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS1.txt
-        wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS2.txt
-        wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS3.txt
-        """
+        cb1 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS1.txt'),
+        cb2 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS2.txt'),
+        cb3 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS3.txt')
+    run:
+        sample = wildcards.sample
+        symlink_whitelist(sample)
 
-rule align_wta_96x3:
+    
+rule align_wta:
     input:
         r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
         r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
         index_flag = op.join(config['working_dir'] , 'data', 'index', 'SAindex'),
         gtf = config['gtf'],
-        cb1 = op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS1.txt'),
-        cb2 = op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS2.txt'),
-        cb3 = op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS3.txt')
+        cb1 = op.join(config['working_dir'], 'align_wta', "{sample}",  'whitelists', 'BD_CLS1.txt'),
+        cb2 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS2.txt'),
+        cb3 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS3.txt')
     output:
         bam = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam')),
         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
@@ -331,7 +357,7 @@ rule generate_tso_whitelist_from_wta_filtered:
         """
         
 
-rule align_tso_96x3:
+rule align_tso:
     input:
         r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
         r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),

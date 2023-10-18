@@ -77,6 +77,10 @@ We provide (within the `Dockerfile`) a data simulation plus analysis workflow. I
 
 The rationale behind is: lorem ipsum.
 
+### Picking up the right whitelist
+
+- 96x3 Lorem ipsum
+- 384x3 Lorem ipsum
 
 ### TSO counting only target features/regions
 
