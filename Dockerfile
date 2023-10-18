@@ -1,4 +1,5 @@
-FROM ubuntu:22.04
+## FROM ubuntu:22.04##
+FROM bioconductor/bioconductor:RELEASE_3_17
 
 LABEL maintainer="izaskun.mallona@gmail.com"
 
@@ -21,26 +22,23 @@ RUN cd /home/rock/ && \
     mkdir -p data && \
     pip install snakemake pandas
 
-# STAR
+# STAR, subread, SingleCellExperiment
 
 RUN mkdir -p /home/rock/soft/star && \
     cd /home/rock/soft/star && \
     wget https://github.com/alexdobin/STAR/archive/2.7.10b.tar.gz && \
     tar -xzf 2.7.10b.tar.gz && \
     cd STAR-2.7.10b/source && \
-    make
-
-# subread
-
-RUN mkdir -p /home/rock/soft/subread && \
+    make && \
+    mkdir -p /home/rock/soft/subread && \
     cd /home/rock/soft/subread && \
     wget 'https://sourceforge.net/projects/subread/files/subread-2.0.6/subread-2.0.6-source.tar.gz/download' && \
     tar xzvf download && \
     cd subread-2.0.6-source/src && \
     make -f Makefile.Linux && \
-    ln -s  /home/rock/soft/subread/subread-2.0.6-source/bin/featureCounts /usr/local/bin/featureCounts
-
-RUN chown -R rock:rock /home/rock
+    ln -s  /home/rock/soft/subread/subread-2.0.6-source/bin/featureCounts /usr/local/bin/featureCounts && \
+    R -e 'BiocManager::install(c("argparse", "SingleCellExperiment", "Matrix"), update = FALSE)' && \
+    chown -R rock:rock /home/rock
 
 USER rock
 

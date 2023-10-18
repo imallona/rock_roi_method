@@ -9,9 +9,9 @@
 
 # import os
 import os.path as op
-from glob import glob
-import pandas as pd
-import re
+# from glob import glob
+# import pandas as pd
+# import re
 
 configfile: "config.yaml"
 
@@ -534,11 +534,20 @@ rule generate_sce:
     output:
         sce = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds')
     params:
-        run_mode = config['run_mode']
-    run:
-        if params.run_mode in ['all', 'tso ontarget multi']:
-            shell ("""
-            echo 'all or multi' > {output.sce}
-            """)
-        else:
-            shell(" echo 'something else' > {output.sce}")
+        run_mode = config['run_mode'],
+        working_dir = config['working_dir'],
+        sample = "{wildcards.sample}"
+    # run:
+    #     if params.run_mode in ['all', 'tso ontarget multi']:
+    #         shell ("""
+    #         echo 'all or multi' > {output.sce}
+    #         """)
+    #     else:
+    #         shell(" echo 'something else' > {output.sce}")
+    shell:
+        """
+        Rscript generate_sce_object.R --sample {wildcards.sample} \
+             --run_mode {params.run_mode} \
+             --working_dir {params.working_dir} \
+             --output_fn {output.sce}
+        """

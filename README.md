@@ -22,7 +22,6 @@ The workflow follows these steps:
 Hence, our workflow always reports a WTA count table with as many genes as on-target and off-target gene features in the GTF, and per filtered-in cell barcode. As for the TSO, we offer these run modes:
 
 - `tso off- and ontarget unique`: generates a count table for TSO reads from filtered-in cells; this count table has the same dimensions as the WTA.
-- `tso ontarget unique`: creates a count table for TSO reads from filtered-in cells for only on-target features.
 - `tso ontarget multi`: creates a count table for TSO reads from filtered-in cells for only on-target features while allowing for multioverlapping and multimapping alignments.
 - `all`: produces both `tso off- and ontarget unique` and `tso ontarget multi` outputs.
 
