@@ -77,6 +77,24 @@ We provide (within the `Dockerfile`) a data simulation plus analysis workflow. I
 
 The rationale behind is: lorem ipsum.
 
+
+### TSO counting only target features/regions
+
+To subset the GTF features to count during the custom TSO counting process:
+
+1. Write the starting GTF (`config['gtf']`) so it contains an indentifier in column2, i.e. you could flag the features that are being 'rock'-ed or 'roi'-ed with a searchable `source` (https://www.ensembl.org/info/website/upload/gff.html)[GTF column 2]. 
+
+For instance, with `captured` in column2.
+
+```
+offtarget       ERCC    exon    1       1061    .       +       .       gene_id "offtarget"; transcript_id "offtarget_1";
+ontarget        captured        exon    1       1023    .       +       .       gene_id "ontarget_1"; transcript_id "ontarget_1";
+ontarget        captured        exon    100     800     .       +       .       gene_id "ontarget_1b"; transcript_id "ontarget_1b";
+ontarget        captured        exon    1030    1090    .       +       .       gene_id "ontarget_2"; transcript_id "ontarget_2";
+```
+
+Then, edit the `config.yaml` file so the `capture_gtf_column_2_pattern` reads `captured`.
+
 ## License
 
 GPLv3

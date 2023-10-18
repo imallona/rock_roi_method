@@ -30,8 +30,7 @@ if config['simulate']:
                              'cb_umi_fq': op.join(config['working_dir'], 'data', 'simulated', 'r1.fq.gz'),
                              'cdna_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
                              'whitelist': '96x3', 'expected_cells': 500}}]
-
-
+    config['capture_gtf_column_2_pattern'] = 'captured'
     
 def get_sample_names():
     return([x['name'] for x in config['samples']])
@@ -67,7 +66,7 @@ umis = ['AACCTTGG', 'CCGGTTAA', 'TTGGCCAA', 'GACATAGG']
 
 rule all:
     input:
-        expand(op.join(config['working_dir'], 'multimodal', '{sample}', 'merged.bam'),
+        expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
                sample = get_sample_names())
     
 rule index:
@@ -173,15 +172,16 @@ AAAAAAAAAAAAAAAAAAAAAAA
 EOF
         """
 
+## notice the `captured` flag to focus on the last three GTF records during the custom featurecounting
 rule simulate_gtf:
     output:
         op.join(config['working_dir'], 'data', 'genome.gtf')
     shell:
         """
 echo -e 'offtarget\tERCC\texon\t1\t1061\t.\t+\t.\tgene_id "offtarget"; transcript_id "offtarget_1";
-ontarget\tERCC\texon\t1\t1023\t.\t+\t.\tgene_id "ontarget_1"; transcript_id "ontarget_1";
-ontarget\tERCC\texon\t100\t800\t.\t+\t.\tgene_id "ontarget_1b"; transcript_id "ontarget_1b";
-ontarget\tERCC\texon\t1030\t1090\t.\t+\t.\tgene_id "ontarget_2"; transcript_id "ontarget_2";' > {output}
+ontarget\tcaptured\texon\t1\t1023\t.\t+\t.\tgene_id "ontarget_1"; transcript_id "ontarget_1";
+ontarget\tcaptured\texon\t100\t800\t.\t+\t.\tgene_id "ontarget_1b"; transcript_id "ontarget_1b";
+ontarget\tcaptured\texon\t1030\t1090\t.\t+\t.\tgene_id "ontarget_2"; transcript_id "ontarget_2";' > {output}
         """
 
 rule simulate_fastqs:
@@ -273,7 +273,7 @@ rule align_wta_96x3:
         cb2 = op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS2.txt'),
         cb3 = op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS3.txt')
     output:
-        bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        bam = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam')),
         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                     'filtered', 'barcodes.tsv')
     params:
@@ -341,7 +341,7 @@ rule align_tso_96x3:
         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                     'filtered', 'barcodes.tsv')
     output:
-        bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam')
+        bam = temp(op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'))
     params:
         path = op.join(config['working_dir'], 'align_tso', "{sample}/"),
         index_path = op.join(config['working_dir'] , 'data', 'index'),
@@ -392,9 +392,10 @@ rule create_config_file_for_custom_counting:
         fc = 'featureCounts',
         parsing_threads = 4,
         fc_threads = 4,
-        path = op.join(config['working_dir'], 'multimodal', '{sample}'),
-        output_bam_fn = 'merged.bam',
-        seqlogo = op.join(config['working_dir'], 'multimodal', '{sample}', 'seqlogo.png')
+        path = op.join(config['working_dir'], 'multimodal', '{sample}/'), ## mind the last slash
+        output_bam_fn = '{sample}_tso_and_wta.bam',
+        seqlogo = op.join(config['working_dir'], 'multimodal', '{sample}', 'seqlogo.png'),
+        capture_pattern = config['capture_gtf_column_2_pattern']
     shell:
         """
 mkdir -p {params.path}
@@ -406,7 +407,7 @@ input_bam_file_paths:
 unique_cb_bamfile_list:               # for valid cell bar codes extraction
   - {params.wta_bam}
 gtf_file: {params.gtf}
-featureCounts_path: params.fc
+featureCounts_path: {params.fc}
 
 # input parameters
 linker_pattern_for_seq_logo: ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC) # tso pattern to get tso tail seq logo
@@ -427,14 +428,14 @@ rg_tag_names:
   - wta
   - tso 
 
-chromosomes:                            # chromosomes to be processed
+chromosomes:                            # chromosomes to be processed (None means all of them)
   - None
 
-subset_gtf: 0                           # subset gtf file by pattern (1: yes, 0: no)
-subset_gtf_output_file: alien.gtf       # output file name of subset of gtf file
-subset_gtf_pattern: ''                  # filter gtf file by this pattern if subset_gtf = 1
+subset_gtf: 1                           # subset gtf file by pattern (1: yes, 0: no)
+subset_gtf_output_file: ontarget.gtf    # output file name of subset of gtf file
+subset_gtf_pattern: {params.capture_pattern}  # filter gtf file by this pattern if subset_gtf = 1
 write_final_bam_to_csv: 0               # write final merged bam file to a csv file(1: yes, 0: no)
-write_final_bam_header_to_txt: 1        # write final merged bam header to text file (1: yes, 0: no)
+write_final_bam_header_to_txt: 0        # write final merged bam header to text file (1: yes, 0: no)
 nProcessors: {params.parsing_threads}   # for multiprocessing
 nthreads: {params.fc_threads}           # for featureCounts
 
@@ -451,10 +452,11 @@ rule count_custom_regions_tso:
     input:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml')        
+        config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
+        gtf = config['gtf']
     output:
-        merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', 'merged.bam'),
-        seqlogo = op.join(config['working_dir'], 'multimodal', '{sample}', 'seqlogo.png')
+        merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
+        fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted')
     params:
         module_path = op.join('module', 'src')
     shell:

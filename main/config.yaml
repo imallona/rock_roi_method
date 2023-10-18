@@ -16,9 +16,11 @@ per_task_max_mem:  1038822112
 ## to fill if `simulate : False`
 ## if `simulate: True` then all config below this line will be replaced by
 ##   hardcoded values (within the Snakefile)
-
 gtf: /home/imallona/tmp/snmk/data/genome.gtf
 genome: /home/imallona/tmp/snmk/data/genome.fa
+
+## GTF `source` field identifying on-target rock- or roi- features
+capture_gtf_column_2_pattern : 'captured'
 
 samples:
   - name: simulated
