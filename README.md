@@ -1,9 +1,45 @@
+# Aim
+
+This repository belongs to the rock and roi project from the University of Zurich. You might want to browse https://github.com/imallona/rock_roi_paper too.
+
+This repository includes a Snakemake workflow to automate data processing from raw reads to count tables (and R `singleCellExperiment` objects) listing both on-target TSO and off-target WTA readouts. The software stack needed to run the method is containerized using Docker.
+
+To analyze their data, users need to provide their sequencing files in fastq format (one for the cell barcode plus UMI; and another for the cDNA) and a configuration file specifying the experiment characteristics and extra information, including:
+
+1. A genome (fasta) to align the genome to (i.e. hg38, mm10 etc). The genome needs to contain all (ontarget) captured sequences, so if these do not belong to the standard genome (i.e. GFP, tdTomato) it needs to be updated to append the extra sequences.
+2. A gene annotation (GTF) whose features are quantified separately for WTA and TSO. It is expected to contain a whole transcriptome gene annotation (i.e. Gencode, Refseq etc) as well as an explicit definition of the rock and/or roi targets captured by the TSO. Instructions to build this GTF are included within the software’s documentation.
+3. A set of cell barcode whitelists following BDRhapsody’s standards (standard BDRhapsody cell barcodes are included within the software)
+4. Parameters to fine tune CPU and memory usage.
+5. Parameters to fine tune the expected number of cells and other EmptyDrops parameters.
+
+The workflow follows these steps:
+
+1. Index the reference genome with STAR.
+2. Subset reads matching the WTA cell barcodes and map those to the transcriptome (genome plus GTF) using STARsolo. Detected cell barcodes (cells) are filtered in at two levels: first, by matching to the user-provided cell barcode whitelist; and second, by applying the EmptyDrops algorithm to discard empty droplets. We report two outputs from this step: the filtered-in cells according to the aforementioned filters; and the unbiased, whole-transcriptome WTA count table
+3. Subset reads matching both the TSO CB structure and the filtered in cell barcodes and map those to the transcriptome. Our reasoning is that the expected TSO transcriptional complexity is undefined and not usable to tell apart cells from empty droplets, so we borrow the filtered-in cells from the EmptyDrops results from the WTA analysis.
+4. (optional) Count on-target features in a more lenient way, filtering in multioverlapping and multimapping reads. This run mode is recommended when the captured regions target non unique loci (i.e. repetitive sequences).
+
+Hence, our workflow always reports a WTA count table with as many genes as on-target and off-target gene features in the GTF, and per filtered-in cell barcode. As for the TSO, we offer these run modes:
+
+- `tso off- and ontarget unique`: generates a count table for TSO reads from filtered-in cells; this count table has the same dimensions as the WTA.
+- `tso ontarget unique`: creates a count table for TSO reads from filtered-in cells for only on-target features.
+- `tso ontarget multi`: creates a count table for TSO reads from filtered-in cells for only on-target features while allowing for multioverlapping and multimapping alignments.
+- `all`: produces both `tso off- and ontarget unique` and `tso ontarget multi` outputs.
+
+Finally, we generate an R SingleCellExperiment object with the aforementioned count tables and the following structure:
+- `wta` assay: raw counts from the WTA analysis.
+- (optional) `tso_off_and_ontarget_unique` assay: raw counts from the `tso off- and ontarget` or `all` run modes.
+- (optional) `tso_ontarget_unique` assay: raw counts from the `tso ontarget unique`: run mode.
+- (optional) `tso_ontarget_multi` assay: raw counts from the `tso ontarget multi` run mode.
+
+We also provide a simulation runmode to showcase the method, where raw reads (fastqs), genome and GTF are generated for three on-target features and one off-target features across XXX cells before running the method.
+
 ## Repository structure
 
-- `data`: Contains the scripts to generate fake data for testing the pipeline
-- `main`: Contains the scripts and python module to align and count both targeted and untargeted gene expression.
+- `data`: Contains BD Rhapsody whitelists and a bash script to generate fake data for run the method (in bash).
+- `main`: Contains the Snakemafile and python module to align and count both targeted and untargeted gene expression.
 
-## Installs / requirements
+## Installs and/or running the method
 
 We asume a GNU/Linux system. We haven't tested it on Mac and it won't run on Windows.
 
@@ -17,7 +53,7 @@ Within the root of this directory (so the `Dockerfile` is there):
 docker build . -t rock && docker run -it --entrypoint /bin/bash rock
 ```
 
-## Using docker and snakemake
+### Using docker and snakemake
 
 Assuming a single-threaded execution:
 
@@ -31,7 +67,7 @@ snakemake -p --cores 1 --configfile config.yaml
 
 ```
 
-### Manually
+### Installing (compilling) dependencies manually
 
 #### STAR (STARsolo)
 
@@ -65,22 +101,22 @@ make -f Makefile.Linux
 ln -s  ~/soft/soft/subread/subread-2.0.6-source/bin/featureCounts ~/.local/bin/featureCounts
 ```
 
-## Usage
+## Usage tips
 
 ### Writing a config file for snakemake
 
-Lorem ipsum
+Please check [our example config yaml](./main/config.yaml).
 
 ### Simulation
 
-We provide (within the `Dockerfile`) a data simulation plus analysis workflow. In brief, we aim to quantify in 2 cells a set of features: one is `offtarget` and captured by the WTA assay; and others are (multioverlapping, multimapper) `ontarget` readouts captured by the TSO assay.
+We provide a data simulation procedure to be able to run the workflow on them. In brief, we aim to quantify in 2 cells a set of features: one is `offtarget` and captured by the WTA assay; and others are (multioverlapping, multimapper) `ontarget` readouts captured by the TSO assay.
 
 The rationale behind is: lorem ipsum.
 
 ### Picking up the right whitelist
 
-- 96x3 Lorem ipsum
-- 384x3 Lorem ipsum
+- 96x3: Enhanced beads, 2022 and 2023
+- 384x3: Latest enhanced beads batches, 2023
 
 ### TSO counting only target features/regions
 
@@ -108,3 +144,7 @@ GPLv3
 - Izaskun Mallona 
 - Nidhi Agrawal
 - We reuse and adapt tools from STAR, subread (featurecounts), samtools and others; we are extremely grateful to their contributors for their unvaluable resources free and openly provided to the community
+
+## Contact
+
+izaskun.mallona at gmail dot com

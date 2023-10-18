@@ -15,6 +15,8 @@ import re
 
 configfile: "config.yaml"
 
+print(config)
+            
 if config['simulate']:
     config['gtf'] = op.join(config['working_dir'], 'data', 'genome.gtf')
     config['genome'] = op.join(config['working_dir'], 'data', 'genome.fa')
@@ -29,6 +31,7 @@ if config['simulate']:
                              'cdna_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
                              'whitelist': '96x3', 'expected_cells': 500}}]
     config['capture_gtf_column_2_pattern'] = 'captured'
+    config['run_mode'] = 'all'
     
 def get_sample_names():
     return([x['name'] for x in config['samples']])
@@ -62,7 +65,7 @@ umis = ['AACCTTGG', 'CCGGTTAA', 'TTGGCCAA', 'GACATAGG']
 
 rule all:
     input:
-        expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
+        expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
                sample = get_sample_names())
     
 rule index:
@@ -278,8 +281,10 @@ def symlink_whitelist(sample):
 
 rule prepare_whitelists:
     input:
-        r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
-        r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz')
+        r1 = lambda wildcards: get_r1_by_name(wildcards.sample),
+        r2 = lambda wildcards: get_r2_by_name(wildcards.sample)
+        # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
+        # r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz')
     output:
         cb1 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS1.txt'),
         cb2 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS2.txt'),
@@ -288,11 +293,34 @@ rule prepare_whitelists:
         sample = wildcards.sample
         symlink_whitelist(sample)
 
+# def create_run_mode_flag_files():
+#     if config['run_mode'] == 'all':
+#         with open(op.join(config['working_dir'], 'report_tso.flag'), 'w') as fh:
+#             fh.write("flag")
+#         with open(op.join(config['working_dir'], 'report_nidhis.flag'), 'w') as fh:
+#             fh.write("flag") 
+#     elif config['run_mode'] == 'tso off- and ontarget unique':
+#         with open(op.join(config['working_dir'], 'report_tso.flag'), 'w') as fh:
+#             fh.write("flag")
+#     elif config['run_mode'] == 'tso ontarget multi':
+#         with open(op.join(config['working_dir'], 'report_nidhis.flag'), 'w') as fh:
+#             fh.write("flag")
+#     with open(op.join(config['working_dir'], 'run_mode_done.flag'), 'w') as fh:
+#             fh.write("flag")
+
+    
+# rule define_run_mode:
+#     output:
+#         cb1 = op.join(config['working_dir'], 'run_mode_done.flag'),
+#     run:
+#         create_run_mode_flag_files()
     
 rule align_wta:
     input:
-        r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
-        r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
+        # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
+        # r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
+        r1 = lambda wildcards: get_r1_by_name(wildcards.sample),
+        r2 = lambda wildcards: get_r2_by_name(wildcards.sample),
         index_flag = op.join(config['working_dir'] , 'data', 'index', 'SAindex'),
         gtf = config['gtf'],
         cb1 = op.join(config['working_dir'], 'align_wta', "{sample}",  'whitelists', 'BD_CLS1.txt'),
@@ -359,8 +387,10 @@ rule generate_tso_whitelist_from_wta_filtered:
 
 rule align_tso:
     input:
-        r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
-        r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
+        # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
+        # r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
+        r1 = lambda wildcards: get_r1_by_name(wildcards.sample),
+        r2 = lambda wildcards: get_r2_by_name(wildcards.sample),
         index_flag = op.join(config['working_dir'] , 'data', 'index', 'SAindex'),
         gtf = config['gtf'],
         tso_whitelist = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist.txt'),
@@ -408,7 +438,7 @@ rule align_tso:
 rule create_config_file_for_custom_counting:
     input:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam')
     output:
         config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml')
     params:
@@ -421,9 +451,11 @@ rule create_config_file_for_custom_counting:
         path = op.join(config['working_dir'], 'multimodal', '{sample}/'), ## mind the last slash
         output_bam_fn = '{sample}_tso_and_wta.bam',
         seqlogo = op.join(config['working_dir'], 'multimodal', '{sample}', 'seqlogo.png'),
-        capture_pattern = config['capture_gtf_column_2_pattern']
-    shell:
-        """
+        capture_pattern = config['capture_gtf_column_2_pattern'],
+        run_mode = config['run_mode']
+    run:
+        if params.run_mode in ['all', 'tso ontarget multi']:
+            shell ("""
 mkdir -p {params.path}
 cat <<EOF > {output.config}
 # input file paths
@@ -472,7 +504,7 @@ featureCounts_output_file: featurecounted
 log_file: log.txt
 error_log: error_log.txt
 EOF
-        """
+        """)
         
 rule count_custom_regions_tso:
     input:
@@ -484,9 +516,29 @@ rule count_custom_regions_tso:
         merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
         fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted')
     params:
-        module_path = op.join('module', 'src')
-    shell:
-        """
-        cd {params.module_path}
-        python -m  main.combined_rock_roi --config {input.config}
-        """
+        module_path = op.join('module', 'src'),
+        run_mode = config['run_mode']
+    run:
+        if params.run_mode in ['all', 'tso ontarget multi']:
+            shell ("""
+            cd {params.module_path}
+            python -m  main.combined_rock_roi --config {input.config}
+            """)
+
+rule generate_sce:
+    input:
+        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
+        gtf = config['gtf']
+    output:
+        sce = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds')
+    params:
+        run_mode = config['run_mode']
+    run:
+        if params.run_mode in ['all', 'tso ontarget multi']:
+            shell ("""
+            echo 'all or multi' > {output.sce}
+            """)
+        else:
+            shell(" echo 'something else' > {output.sce}")
