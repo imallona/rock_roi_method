@@ -15,14 +15,24 @@ import re
 
 configfile: "config.yaml"
 
-# samples = pd.read_table(config["metadata"])
-
-# print(samples.head())
-# print(samples.cb_umi_fastq.tolist())
-print(config)
-print(config.keys())
 print(config['samples'])
 
+if config['simulate']:
+    config['gtf'] = op.join(config['working_dir'], 'data', 'genome.gtf')
+    config['genome'] = op.join(config['working_dir'], 'data', 'genome.fa')
+    config['samples'] = [{'name': 'simulated',
+                          'uses': {
+                              'cb_umi_fq': op.join(config['working_dir'], 'data', 'simulated', 'r1.fq.gz'),
+                              'cdna_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
+                              'whitelist': '96x3',
+                              'expected_cells': 500}},
+                         {'name': 'simulated2', 'uses': {
+                             'cb_umi_fq': op.join(config['working_dir'], 'data', 'simulated', 'r1.fq.gz'),
+                             'cdna_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
+                             'whitelist': '96x3', 'expected_cells': 500}}]
+
+
+    
 def get_sample_names():
     return([x['name'] for x in config['samples']])
 
@@ -41,18 +51,13 @@ def get_expected_cells_by_name(name):
         if config['samples'][i]['name'] == name:
              return(config['samples'][i]['uses']['expected_cells'])
 
-## old bd whitelists
-def get_96x3_samples():
-   matching = []
-   for i in range(len(config['samples'])):
-        if config['samples'][i]['uses']['whitelist'] == '96x3':
-             matching.append(config['samples'][i]['name'])
-   return(matching)
-     
-
-# cb1s = ['GTCGCTATA','CTTGTACTA']
-# cb2s = ['TACAGGATA',]
-# cb3s = ['AAGCCTTCT']
+# ## old bd whitelists
+# def get_96x3_samples():
+#    matching = []
+#    for i in range(len(config['samples'])):
+#         if config['samples'][i]['uses']['whitelist'] == '96x3':
+#              matching.append(config['samples'][i]['name'])
+#    return(matching)
 
 ## canonical CB 9-mers or just A{9}
 cb1s = ['GTCGCTATA','CTTGTACTA','CTTCACATA','ACACGCCGG','CGGTCCAGG','AATCGAATG','CCTAGTATA']
@@ -62,25 +67,24 @@ umis = ['AACCTTGG', 'CCGGTTAA', 'TTGGCCAA', 'GACATAGG']
 
 rule all:
     input:
-        expand(op.join('..', 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-               sample = 'simulated'),
-        op.join('..', 'multimodal', 'simulated', 'merged.bam')
+        expand(op.join(config['working_dir'], 'multimodal', '{sample}', 'merged.bam'),
+               sample = get_sample_names())
     
 rule index:
     input:
         gtf = config['gtf'],
         fa = config['genome']
     output:
-        index_path =  op.join('..' , 'data', 'index', 'SAindex')
+        index_path =  op.join(config['working_dir'] , 'data', 'index', 'SAindex')
     threads:
         config['nthreads']
     params:
         simulate = config['simulate'],
-        processing_path = op.join('..', 'data'),
+        processing_path = op.join(config['working_dir'], 'data'),
         nthreads = config['nthreads'],
         star = config['STAR']
     log:
-        op.join('..', 'data', 'index', 'indexing.log')
+        op.join(config['working_dir'], 'data', 'index', 'indexing.log')
     shell:
       """
     mkdir -p {params.processing_path}
@@ -97,7 +101,7 @@ rule index:
 
 rule simulate_genome:
     output:
-        op.join('..', 'data', 'genome.fa')
+        op.join(config['working_dir'], 'data', 'genome.fa')
     shell:
         """
 cat << EOF > {output}
@@ -171,7 +175,7 @@ EOF
 
 rule simulate_gtf:
     output:
-        op.join('..', 'data', 'genome.gtf')
+        op.join(config['working_dir'], 'data', 'genome.gtf')
     shell:
         """
 echo -e 'offtarget\tERCC\texon\t1\t1061\t.\t+\t.\tgene_id "offtarget"; transcript_id "offtarget_1";
@@ -182,19 +186,19 @@ ontarget\tERCC\texon\t1030\t1090\t.\t+\t.\tgene_id "ontarget_2"; transcript_id "
 
 rule simulate_fastqs:
     input:
-        part_r1 = expand(op.join('..', 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz'),
+        part_r1 = expand(op.join(config['working_dir'], 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz'),
                          sample = get_sample_names(),
                          cb1 = cb1s, cb2 = cb2s, cb3 = cb3s, umi = umis),
-        part_r2 = expand(op.join('..', 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'),
+        part_r2 = expand(op.join(config['working_dir'], 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'),
                          sample = get_sample_names(),
                          cb1 = cb1s, cb2 = cb2s, cb3 = cb3s, umi = umis)
     params:
-        path = op.join('..', 'data', '{sample}')
+        path = op.join(config['working_dir'], 'data', '{sample}')
     output:
-        r1 = op.join('..', 'data', '{sample}', 'r1.fq.gz'),
-        r2 = op.join('..', 'data', '{sample}', 'r2.fq.gz'),
-        r1_extra = temp(op.join('..', 'data', '{sample}', 'r1_extra.fq.gz')),
-        r2_extra = temp(op.join('..', 'data', '{sample}', 'r2_extra.fq.gz')),
+        r1 = op.join(config['working_dir'], 'data', '{sample}', 'r1.fq.gz'),
+        r2 = op.join(config['working_dir'], 'data', '{sample}', 'r2.fq.gz'),
+        r1_extra = temp(op.join(config['working_dir'], 'data', '{sample}', 'r1_extra.fq.gz')),
+        r2_extra = temp(op.join(config['working_dir'], 'data', '{sample}', 'r2_extra.fq.gz')),
 
     shell:
         """
@@ -211,10 +215,10 @@ cat {input.part_r2} {output.r2_extra} > {output.r2}
        
 rule simulate_fastqs_from_a_cell:
     output:
-        part_r1 =  temp(op.join('..', 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz')),
-        part_r2 =  temp(op.join('..', 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'))
+        part_r1 =  temp(op.join(config['working_dir'], 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz')),
+        part_r2 =  temp(op.join(config['working_dir'], 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'))
     params:
-        path = op.join('..', 'data', '{sample}'),
+        path = op.join(config['working_dir'], 'data', '{sample}'),
         tso_fix1 = "AATG",
         tso_fix2 = "CCAC",
         wta_fix1 = "GTGA",
@@ -245,11 +249,11 @@ seq 21 30 | awk ' {{print "@tso"$0"_{wildcards.cb1}{wildcards.cb1}{wildcards.cb3
 
 rule retrieve_whitelist:
     output:
-        op.join('..', 'data', 'whitelists', 'BD_CLS1.txt'),
-        op.join('..', 'data', 'whitelists', 'BD_CLS2.txt'),
-        op.join('..', 'data', 'whitelists', 'BD_CLS3.txt')
+        op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS1.txt'),
+        op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS2.txt'),
+        op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS3.txt')
     params:
-        path = op.join('..', 'data', 'whitelists')
+        path = op.join(config['working_dir'], 'data', 'whitelists')
     shell:
         """
         mkdir -p {params.path}
@@ -261,25 +265,25 @@ rule retrieve_whitelist:
 
 rule align_wta_96x3:
     input:
-        r1 = op.join('..', 'data', "{sample}", 'r1.fq.gz'),
-        r2 = op.join('..', 'data', "{sample}", 'r2.fq.gz'),
-        index_flag = op.join('..' , 'data', 'index', 'SAindex'),
+        r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
+        r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
+        index_flag = op.join(config['working_dir'] , 'data', 'index', 'SAindex'),
         gtf = config['gtf'],
-        cb1 = op.join('..', 'data', 'whitelists', 'BD_CLS1.txt'),
-        cb2 = op.join('..', 'data', 'whitelists', 'BD_CLS2.txt'),
-        cb3 = op.join('..', 'data', 'whitelists', 'BD_CLS3.txt')
+        cb1 = op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS1.txt'),
+        cb2 = op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS2.txt'),
+        cb3 = op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS3.txt')
     output:
-        bam = op.join('..', 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        filtered_barcodes = op.join('..', 'align_wta', '{sample}', 'Solo.out', 'Gene',
+        bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                     'filtered', 'barcodes.tsv')
     params:
-        path = op.join('..', 'align_wta', "{sample}/"),
-        index_path = op.join('..' , 'data', 'index'),
+        path = op.join(config['working_dir'], 'align_wta', "{sample}/"),
+        index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
         threads = 5, # config['nthreads'],
         # num_cells = get_expected_cells_by_name("{sample}"),
         num_cells = 2,
-        tmp = op.join('..', 'tmp_align_wta_{sample}'),
+        tmp = op.join(config['working_dir'], 'tmp_align_wta_{sample}'),
         maxmem = config['per_task_max_mem']
     shell:
         """
@@ -314,12 +318,12 @@ rule align_wta_96x3:
         
 rule generate_tso_whitelist_from_wta_filtered:
     input:
-        filtered_barcodes = op.join('..', 'align_wta', '{sample}', 'Solo.out', 'Gene',
+        filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                     'filtered', 'barcodes.tsv')
     output:
-        tso_whitelist = op.join('..', 'data', '{sample}', 'tso_whitelist.txt')
+        tso_whitelist = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist.txt')
     params:
-        path = op.join('..', 'data', '{sample}')
+        path = op.join(config['working_dir'], 'data', '{sample}')
     shell:
         """
         mkdir -p {params.path}
@@ -329,21 +333,21 @@ rule generate_tso_whitelist_from_wta_filtered:
 
 rule align_tso_96x3:
     input:
-        r1 = op.join('..', 'data', "{sample}", 'r1.fq.gz'),
-        r2 = op.join('..', 'data', "{sample}", 'r2.fq.gz'),
-        index_flag = op.join('..' , 'data', 'index', 'SAindex'),
+        r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
+        r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
+        index_flag = op.join(config['working_dir'] , 'data', 'index', 'SAindex'),
         gtf = config['gtf'],
-        tso_whitelist = op.join('..', 'data', '{sample}', 'tso_whitelist.txt'),
-        filtered_barcodes = op.join('..', 'align_wta', '{sample}', 'Solo.out', 'Gene',
+        tso_whitelist = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist.txt'),
+        filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                     'filtered', 'barcodes.tsv')
     output:
-        bam = op.join('..', 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam')
+        bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam')
     params:
-        path = op.join('..', 'align_tso', "{sample}/"),
-        index_path = op.join('..' , 'data', 'index'),
+        path = op.join(config['working_dir'], 'align_tso', "{sample}/"),
+        index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
         threads = 5, #config['nthreads'],
-        tmp = op.join('..', 'tmp_align_tso_{sample}'),
+        tmp = op.join(config['working_dir'], 'tmp_align_tso_{sample}'),
         maxmem = config['per_task_max_mem']
     shell:
         """
@@ -377,25 +381,24 @@ rule align_tso_96x3:
 
 rule create_config_file_for_custom_counting:
     input:
-        tso_bam = op.join('..', 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        wta_bam = op.join('..', 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
     output:
-        config = op.join('..', 'multimodal', '{sample}', 'config.yaml'),
-        seqlogo = op.join('..', 'multimodal', '{sample}', 'seqlogo.png')
+        config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml')
     params:
-        tso_bam = op.join('..', 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        wta_bam = op.join('..', 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         gtf = config['gtf'],
         fc = 'featureCounts',
         parsing_threads = 4,
-        featurecounts_threads = 4,
-        path = op.join('..', 'multimodal', '{sample}'),
-        output_bam_fn = 'merged.bam'
+        fc_threads = 4,
+        path = op.join(config['working_dir'], 'multimodal', '{sample}'),
+        output_bam_fn = 'merged.bam',
+        seqlogo = op.join(config['working_dir'], 'multimodal', '{sample}', 'seqlogo.png')
     shell:
         """
 mkdir -p {params.path}
 cat <<EOF > {output.config}
-
 # input file paths
 input_bam_file_paths: 
   - {params.wta_bam}
@@ -406,10 +409,10 @@ gtf_file: {params.gtf}
 featureCounts_path: params.fc
 
 # input parameters
-linker_pattern_for_seq_logo: ^([A-Z]{9})(AATG[A-Z]{9}CCAC) # tso pattern to get tso tail seq logo
+linker_pattern_for_seq_logo: ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC) # tso pattern to get tso tail seq logo
 linker_pattern_list:                  # list of linkers to be matched with alignment. If no match then CB tag is recovered where possible.
-  - ^([A-Z]{9})(AATG[A-Z]{9}CCAC)     # tso linkers
-  - ^(A|GT|TCA)?([A-Z]{9})(GTGA[A-Z]{9}GACA)  # wta linkers
+  - ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC)     # tso linkers
+  - ^(A|GT|TCA)?([A-Z]{{9}})(GTGA[A-Z]{{9}}GACA)  # wta linkers
 seq_logo_filename: {params.seqlogo}
 cb1_len: 9                            # length of first part of CB tag
 cb2_len: 9                            # length of second part of CB tag
@@ -424,19 +427,19 @@ rg_tag_names:
   - wta
   - tso 
 
-chromosomes:                          # chromosomes to be processed
-  - all
+chromosomes:                            # chromosomes to be processed
+  - None
 
 subset_gtf: 0                           # subset gtf file by pattern (1: yes, 0: no)
 subset_gtf_output_file: alien.gtf       # output file name of subset of gtf file
 subset_gtf_pattern: ''                  # filter gtf file by this pattern if subset_gtf = 1
 write_final_bam_to_csv: 0               # write final merged bam file to a csv file(1: yes, 0: no)
-write_final_bam_header_to_txt: 0        # write final merged bam header to text file (1: yes, 0: no)
+write_final_bam_header_to_txt: 1        # write final merged bam header to text file (1: yes, 0: no)
 nProcessors: {params.parsing_threads}   # for multiprocessing
-nthreads: {params.featurecouts_threads} # for featureCounts
+nthreads: {params.fc_threads}           # for featureCounts
 
 # output file names and paths
-output_folder: {params.output_dir}
+output_folder: {params.path}
 final_merged_file: {params.output_bam_fn}
 featureCounts_output_file: featurecounted
 log_file: log.txt
@@ -446,11 +449,12 @@ EOF
         
 rule count_custom_regions_tso:
     input:
-        tso_bam = op.join('..', 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        wta_bam = op.join('..', 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        config = op.join('..', 'align_wta', '{sample}', '')        
+        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml')        
     output:
-        merged_bam = op.join('..', 'multimodal', '{sample}', 'merged.bam')
+        merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', 'merged.bam'),
+        seqlogo = op.join(config['working_dir'], 'multimodal', '{sample}', 'seqlogo.png')
     params:
         module_path = op.join('module', 'src')
     shell:

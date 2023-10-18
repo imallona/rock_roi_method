@@ -115,7 +115,16 @@ def main():
         # get genomic length of chromosome from first input bam file header
         print('Getting genomic length of chromosome...')
         chr_length_dict = {}
-        for chr_name in chromosomes: 
+
+        ## patch to retrievel chr_names when inputted as `None` within the `chromosomes` yaml field
+        
+        # print(chromosomes)
+        # print(input_bam.header["SQ"])
+        chromosomes = [x['SN'] for x in input_bam.header["SQ"]]
+        
+        ## patch end
+        
+        for chr_name in chromosomes:
             chr_length_dict[chr_name] = get_reference_length(input_bam.header["SQ"], chr_name)
         # print(f"\nchromosomes: chr_length\n{chr_length_dict}\n")
         print('Done!\n')
@@ -126,6 +135,7 @@ def main():
         # Get genomic area as iterable for multiprocessing for each chromosome
         print('Getting genomic area as iterable for multiprocessing for each chromosome...')
         iterable_dict = {}
+        
         for chr_name in chromosomes:
             end_pos = chr_length_dict[chr_name]
             start_pos = 0
