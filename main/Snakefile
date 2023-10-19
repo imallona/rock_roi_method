@@ -81,18 +81,18 @@ rule index:
         processing_path = op.join(config['working_dir'], 'data'),
         nthreads = config['nthreads'],
         star = config['STAR'],
-        sjdboverhang = config['sjdbOverhang']
+        sjdbOverhang = config['sjdbOverhang']
     log:
         op.join(config['working_dir'], 'data', 'indexing.log')
     shell:
       """
     mkdir -p {params.processing_path}
-    cd {params.processing_path}
+    # cd {params.processing_path}
 
     ({params.star} --runThreadN {params.nthreads} \
      --runMode genomeGenerate \
      --sjdbGTFfile {input.gtf} \
-     --genomeDir index \
+     --genomeDir {params.processing_path}/index \
      --genomeSAindexNbases 4 \
      --sjdbOverhang {params.sjdbOverhang} \
      --genomeFastaFiles {input.fa} ) 2> {log}
@@ -546,12 +546,14 @@ rule count_custom_regions_tso:
         merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
         fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted')
     params:
-        module_path = op.join('module', 'src'),
+        module_path = op.join('module', 'src', 'main'),
         run_mode = config['run_mode']
     run:
         if params.run_mode in ['all', 'tso ontarget multi']:
             shell ("""
-            cd {params.module_path}
+            # cd {params.module_path}
+            ln -s -f {params.module_path} .
+            ln -s -f {params.module_path}/../utilities .
             python -m  main.combined_rock_roi --config {input.config}
             """)
 
@@ -560,7 +562,7 @@ rule generate_sce:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted'),
-        config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
+        # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
         gtf = config['gtf']
     output:
         sce = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds')

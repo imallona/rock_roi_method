@@ -30,7 +30,7 @@ Finally, we generate an R SingleCellExperiment object with the aforementioned co
 - (optional) `tso_off_and_ontarget_unique` assay: raw counts from the `tso off- and ontarget unique` or `all` run modes.
 - (optional) `tso_ontarget_multi` altExp alternative experiment: raw counts from the `tso ontarget multi` run mode.
 
-We also provide a simulation runmode to showcase the method, where raw reads (fastqs), genome and GTF are generated for three on-target features and one off-target features across XXX cells before running the method.
+We also provide a simulation runmode to showcase the method, where raw reads (fastqs), genome and GTF are generated for three on-target features and one off-target features across hundreds of cells before running the method.
 
 ## Repository structure
 
