@@ -2,7 +2,7 @@
 simulate: True
 
 ## where outputs will be generated at
-working_dir: /home/imallona/tmp/snmk
+working_dir: work
 
 ## software stack, will work out of the box if within the supplied docker container
 Rbin: R
@@ -17,8 +17,10 @@ per_task_max_mem:  1038822112
 ## if `simulate: True` then all config below this line will be replaced by
 ##   hardcoded values (within the Snakefile)
 
-gtf: /home/imallona/tmp/snmk/data/genome.gtf
-genome: /home/imallona/tmp/snmk/data/genome.fa
+gtf: work/data/genome.gtf
+genome: work/data/genome.fa
+
+sjdbOverhang: 100
 
 ## run mode, one of these (please see the README / docs):
 ##   'tso off- and ontarget unique'
@@ -32,13 +34,13 @@ capture_gtf_column_2_pattern : 'captured'
 samples:
   - name: simulated
     uses:
-      cb_umi_fq: /home/imallona/tmp/snmk/data/simulated/r1.fq.gz
-      cdna_fq: /home/imallona/tmp/snmk/data/simulated/r2.fq.gz
+      cb_umi_fq: work/data/simulated/r1.fq.gz
+      cdna_fq: work/data/simulated/r2.fq.gz
       whitelist: 96x3
       expected_cells: 500
   - name: simulated2
     uses:
-      cb_umi_fq: /home/imallona/tmp/snmk/data/simulated/r1.fq.gz
-      cdna_fq: /home/imallona/tmp/snmk/data/simulated/r2.fq.gz
+      cb_umi_fq: work/data/simulated/r1.fq.gz
+      cdna_fq: work/data/simulated/r2.fq.gz
       whitelist: 96x3
       expected_cells: 500

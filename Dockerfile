@@ -1,7 +1,8 @@
-## FROM ubuntu:22.04##
+## FROM ubuntu:22.04
 FROM bioconductor/bioconductor:RELEASE_3_17
 
-LABEL maintainer="izaskun.mallona@gmail.com"
+LABEL maintainer="Izaskun Mallona izaskun.mallona@gmail.com"
+LABEL version="v0.1"
 
 RUN useradd -m rock
 
@@ -9,6 +10,7 @@ RUN apt-get update && \
     apt install -y python3-pip python-is-python3 samtools wget less git
 
 WORKDIR /home/rock
+COPY ./data data/
 COPY ./main/module module/
 COPY main/Snakefile main/Snakefile
 COPY main/config.yaml main/config.yaml
@@ -45,9 +47,13 @@ USER rock
 ENV PATH=/home/rock/soft/star/STAR-2.7.10b/source:$PATH
 RUN echo "export PATH=$PATH" >> ~/.bashrc
 
- ## showcase the method with some simulated data
+## showcase the method with some simulated data (simple scenario)
+ 
 RUN cd /home/rock/data && \
     chmod +x simulate_run.sh && \
     bash simulate_run.sh
 
+## showcase the method with simulated data (more complex simulation) and using snakemake
 
+RUN cd /home/rock/main && \
+     snakemake --cores 1 --configfile config.yaml 

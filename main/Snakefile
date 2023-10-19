@@ -80,9 +80,10 @@ rule index:
         simulate = config['simulate'],
         processing_path = op.join(config['working_dir'], 'data'),
         nthreads = config['nthreads'],
-        star = config['STAR']
+        star = config['STAR'],
+        sjdboverhang = config['sjdbOverhang']
     log:
-        op.join(config['working_dir'], 'data', 'index', 'indexing.log')
+        op.join(config['working_dir'], 'data', 'indexing.log')
     shell:
       """
     mkdir -p {params.processing_path}
@@ -93,7 +94,7 @@ rule index:
      --sjdbGTFfile {input.gtf} \
      --genomeDir index \
      --genomeSAindexNbases 4 \
-     --sjdbOverhang 100 \
+     --sjdbOverhang {params.sjdbOverhang} \
      --genomeFastaFiles {input.fa} ) 2> {log}
         """
 
