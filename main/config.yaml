@@ -4,13 +4,6 @@ simulate: True
 ## where outputs will be generated at
 working_dir: /home/imallona/tmp/snmk
 
-## run mode, one of these (please see the README / docs):
-##   'tso off- and ontarget unique'
-##   'tso ontarget unique'
-##   'tso ontarget multi'
-##   'all'
-run_mode: 'tso ontarget unique'
-
 ## software stack, will work out of the box if within the supplied docker container
 Rbin: R
 STAR: STAR
@@ -20,11 +13,18 @@ nthreads: 2
 per_task_max_nthreads: 5
 per_task_max_mem:  1038822112
 
-## to fill if `simulate : False`
+## fill below these line if `simulate : False` -----------------------------------------
 ## if `simulate: True` then all config below this line will be replaced by
 ##   hardcoded values (within the Snakefile)
+
 gtf: /home/imallona/tmp/snmk/data/genome.gtf
 genome: /home/imallona/tmp/snmk/data/genome.fa
+
+## run mode, one of these (please see the README / docs):
+##   'tso off- and ontarget unique'
+##   'tso ontarget multi'
+##   'all'
+run_mode: 'all'
 
 ## GTF `source` field identifying on-target rock- or roi- features
 capture_gtf_column_2_pattern : 'captured'

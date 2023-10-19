@@ -27,9 +27,8 @@ Hence, our workflow always reports a WTA count table with as many genes as on-ta
 
 Finally, we generate an R SingleCellExperiment object with the aforementioned count tables and the following structure:
 - `wta` assay: raw counts from the WTA analysis.
-- (optional) `tso_off_and_ontarget_unique` assay: raw counts from the `tso off- and ontarget` or `all` run modes.
-- (optional) `tso_ontarget_unique` assay: raw counts from the `tso ontarget unique`: run mode.
-- (optional) `tso_ontarget_multi` assay: raw counts from the `tso ontarget multi` run mode.
+- (optional) `tso_off_and_ontarget_unique` assay: raw counts from the `tso off- and ontarget unique` or `all` run modes.
+- (optional) `tso_ontarget_multi` altExp alternative experiment: raw counts from the `tso ontarget multi` run mode.
 
 We also provide a simulation runmode to showcase the method, where raw reads (fastqs), genome and GTF are generated for three on-target features and one off-target features across XXX cells before running the method.
 
