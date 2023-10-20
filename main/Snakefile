@@ -332,21 +332,22 @@ rule align_wta:
         bam = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam')),
         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                     'filtered', 'barcodes.tsv')
+    threads: 5
     params:
         path = op.join(config['working_dir'], 'align_wta', "{sample}/"),
         index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
-        threads = 5, # config['nthreads'],
         # num_cells = get_expected_cells_by_name("{sample}"),
         num_cells = 2,
         tmp = op.join(config['working_dir'], 'tmp_align_wta_{sample}'),
-        maxmem = config['per_task_max_mem']
+        maxmem = config['per_task_max_mem'],
+        sjdbOverhang = config['sjdbOverhang']
     shell:
         """
    rm -rf {params.tmp}
    mkdir -p {params.path} 
 
-   {params.STAR} --runThreadN {params.threads}\
+   {params.STAR} --runThreadN {threads} \
      --genomeDir {params.index_path} \
      --readFilesCommand zcat \
      --outFileNamePrefix {params.path} \
@@ -360,12 +361,12 @@ rule align_wta:
      --soloCellFilter EmptyDrops_CR \
      --outSAMattributes NH HI AS nM NM MD jM jI MC ch CB UB gx gn sS CR CY UR UY \
      --soloCellReadStats Standard \
-     --sjdbOverhang 100 \
      --outSAMtype BAM SortedByCoordinate \
      --quantMode GeneCounts \
      --soloUMIlen 8 \
      --sjdbGTFfile {input.gtf} \
      --outTmpDir {params.tmp} \
+     --sjdbOverhang {params.sjdbOverhang} \
      --limitBAMsortRAM {params.maxmem}
 
     rm -rf {params.tmp}
@@ -404,13 +405,14 @@ rule align_tso:
     output:
         #bam = temp(op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'))
         bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam')
+    threads: 5
     params:
         path = op.join(config['working_dir'], 'align_tso', "{sample}/"),
         index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
-        threads = 5, #config['nthreads'],
         tmp = op.join(config['working_dir'], 'tmp_align_tso_{sample}'),
-        maxmem = config['per_task_max_mem']
+        maxmem = config['per_task_max_mem'],
+        sjdbOverhang = config['sjdbOverhang']
     shell:
         """
    rm -rf {params.tmp}
@@ -420,7 +422,7 @@ rule align_tso:
         ## not reporting the issue 
    # #--soloCBwhitelist input.tso_whitelist
    #      # --soloCBmatchWLtype Exact 
-   # {params.STAR} --runThreadN {params.threads}\
+   # {params.STAR} --runThreadN {threads} \
    #   --genomeDir {params.index_path} \
    #   --readFilesCommand zcat \
    #   --outFileNamePrefix {params.path} \
@@ -441,7 +443,7 @@ rule align_tso:
    #   --outTmpDir {params.tmp} \
    #   --limitBAMsortRAM {params.maxmem}
 
-        {params.STAR} --runThreadN {params.threads} \
+        {params.STAR} --runThreadN {threads} \
         --genomeDir {params.index_path} \
         --readFilesCommand zcat \
         --outFileNamePrefix {params.path} \
@@ -460,6 +462,7 @@ rule align_tso:
          --quantMode GeneCounts \
         --sjdbGTFfile {input.gtf} \
         --outTmpDir {params.tmp} \
+        --sjdbOverhang {params.sjdbOverhang} \
         --limitBAMsortRAM {params.maxmem}
 
         rm -rf {params.tmp}
@@ -471,6 +474,7 @@ rule create_config_file_for_custom_counting:
         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam')
     output:
         config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml')
+    threads: 10        
     params:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
