@@ -22,13 +22,13 @@ if config['simulate']:
     config['genome'] = op.join(config['working_dir'], 'data', 'genome.fa')
     config['samples'] = [{'name': 'simulated',
                           'uses': {
-                              'cb_umi_fq': op.join(config['working_dir'], 'data', 'simulated', 'r1.fq.gz'),
-                              'cdna_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
+                              'cdna_fq': op.join(config['working_dir'], 'data', 'simulated', 'r1.fq.gz'),
+                              'cb_umi_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
                               'whitelist': '96x3',
                               'expected_cells': 500}},
                          {'name': 'simulated2', 'uses': {
-                             'cb_umi_fq': op.join(config['working_dir'], 'data', 'simulated', 'r1.fq.gz'),
-                             'cdna_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
+                             'cdna_fq': op.join(config['working_dir'], 'data', 'simulated', 'r1.fq.gz'),
+                             'cb_umi_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
                              'whitelist': '96x3', 'expected_cells': 500}}]
     config['capture_gtf_column_2_pattern'] = 'captured'
     config['run_mode'] = 'all'
@@ -36,12 +36,12 @@ if config['simulate']:
 def get_sample_names():
     return([x['name'] for x in config['samples']])
 
-def get_r1_by_name(name):
+def get_cbumi_by_name(name):
     for i in range(len(config['samples'])):
         if config['samples'][i]['name'] == name:
              return(config['samples'][i]['uses']['cb_umi_fq'])
 
-def get_r2_by_name(name):
+def get_cdna_by_name(name):
     for i in range(len(config['samples'])):
         if config['samples'][i]['name'] == name:
              return(config['samples'][i]['uses']['cdna_fq'])
@@ -283,8 +283,8 @@ def symlink_whitelist(sample):
 
 rule prepare_whitelists:
     input:
-        r1 = lambda wildcards: get_r1_by_name(wildcards.sample),
-        r2 = lambda wildcards: get_r2_by_name(wildcards.sample)
+        cbumi = lambda wildcards: get_cbumi_by_name(wildcards.sample),
+        cdna = lambda wildcards: get_cdna_by_name(wildcards.sample)
         # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
         # r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz')
     output:
@@ -321,8 +321,8 @@ rule align_wta:
     input:
         # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
         # r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
-        r1 = lambda wildcards: get_r1_by_name(wildcards.sample),
-        r2 = lambda wildcards: get_r2_by_name(wildcards.sample),
+        cdna = lambda wildcards: get_cdna_by_name(wildcards.sample),
+        cbumi = lambda wildcards: get_cbumi_by_name(wildcards.sample),
         index_flag = op.join(config['working_dir'] , 'data', 'index', 'SAindex'),
         gtf = config['gtf'],
         cb1 = op.join(config['working_dir'], 'align_wta', "{sample}",  'whitelists', 'BD_CLS1.txt'),
@@ -351,7 +351,7 @@ rule align_wta:
      --genomeDir {params.index_path} \
      --readFilesCommand zcat \
      --outFileNamePrefix {params.path} \
-     --readFilesIn  {input.r1} {input.r2}  \
+     --readFilesIn  {input.cdna} {input.cbumi}  \
      --soloType CB_UMI_Complex \
      --soloAdapterSequence GTGANNNNNNNNNGACA \
      --soloCBposition 2_-9_2_-1 2_4_2_12 2_17_2_25 \
@@ -392,8 +392,8 @@ rule align_tso:
     input:
         # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
         # r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
-        r1 = lambda wildcards: get_r1_by_name(wildcards.sample),
-        r2 = lambda wildcards: get_r2_by_name(wildcards.sample),
+        cdna = lambda wildcards: get_cdna_by_name(wildcards.sample),
+        cbumi = lambda wildcards: get_cbumi_by_name(wildcards.sample),
         index_flag = op.join(config['working_dir'] , 'data', 'index', 'SAindex'),
         gtf = config['gtf'],
         # tso_whitelist = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist.txt'),
@@ -420,34 +420,14 @@ rule align_tso:
 
         ## with this whitelist the BAM looks good in CR terms but the count tables are broken (!)
         ## not reporting the issue 
-   # #--soloCBwhitelist input.tso_whitelist
-   #      # --soloCBmatchWLtype Exact 
-   # {params.STAR} --runThreadN {threads} \
-   #   --genomeDir {params.index_path} \
-   #   --readFilesCommand zcat \
-   #   --outFileNamePrefix {params.path} \
-   #   --readFilesIn  {input.r1} {input.r2}  \
-   #   --soloType CB_UMI_Complex \
-   #   --soloAdapterSequence AATGNNNNNNNNNCCAC \
-        ## --soloCBwhitelist input.tso_whitelist \
-   #   --soloCBposition 2_-9_2_25 \
-   #   --soloUMIposition 3_10_3_17 \
-   #   --soloUMIlen 8 \
-   #   --soloCellFilter None \
-   #   --outSAMattributes NH HI AS nM NM MD jM jI MC ch CB UB gx gn sS CR CY UR UY \
-   #   --soloCellReadStats Standard \
-   #   --sjdbOverhang 100 \
-   #   --outSAMtype BAM SortedByCoordinate \
-   #   --quantMode GeneCounts \
-   #   --sjdbGTFfile {input.gtf} \
-   #   --outTmpDir {params.tmp} \
-   #   --limitBAMsortRAM {params.maxmem}
+        # #--soloCBwhitelist input.tso_whitelist
+        #      # --soloCBmatchWLtype Exact 
 
         {params.STAR} --runThreadN {threads} \
         --genomeDir {params.index_path} \
         --readFilesCommand zcat \
         --outFileNamePrefix {params.path} \
-        --readFilesIn  {input.r1} {input.r2}  \
+        --readFilesIn  {input.cdna} {input.cbumi}  \
         --soloType CB_UMI_Complex \
          --soloAdapterSequence AATGNNNNNNNNNCCAC \
          --soloCBposition 2_-9_2_-1 2_4_2_12 2_17_2_25 \
