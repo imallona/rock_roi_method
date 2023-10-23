@@ -37,21 +37,31 @@ We also provide a simulation runmode to showcase the method, where raw reads (fa
 - `data`: Contains BD Rhapsody whitelists and a bash script to generate fake data for run the method (in bash).
 - `main`: Contains the Snakemafile and python module to align and count both targeted and untargeted gene expression.
 
+## Snakefile layout
+
+### Without simulation
+
+```
+## i.e. 
+snakemake -s main/Snakefile --configfile ~/src/rock_roi_paper/00_mixing_experiment/mixing_conf.yaml  --dag
+```
+
+- Rulegraph: [png](./data/rulegraph.png), [pdf](./data/rulegraph.pdf), [specs](./data/rulegraph).
+- DAG for a run with four samples: [png](./data/dag.png), [pdf](./data/rulegraph.pdf), [specs](./data/rulegraph).
+
+### With simulation
+
+
+- Rulegraph: [png](./data/simul.png), [specs](./data/rulegraph_simulation)
+- DAG: [specs](.data/dag_simulation) (beware hundreds of cells)
+
 ## Installs and/or running the method
 
 We asume a GNU/Linux system. We haven't tested it on Mac and it won't run on Windows.
 
 We provide a Dockerfile to define a suitable GNU/Linux environment to run our method.
 
-### Using docker and no snakemake
-
-Within the root of this directory (so the `Dockerfile` is there):
-
-```
-docker build . -t rock && docker run -it --entrypoint /bin/bash rock
-```
-
-### Using docker and snakemake
+### Using docker
 
 Assuming a single-threaded execution:
 
@@ -65,7 +75,7 @@ snakemake -p --cores 1 --configfile config.yaml
 
 ```
 
-### Installing (compilling) dependencies manually
+### Installing and user the system's dependencies
 
 #### STAR (STARsolo)
 
@@ -97,6 +107,25 @@ make -f Makefile.Linux
 
 ## assuming ~/.local/bin/ is part of the $PATH
 ln -s  ~/soft/soft/subread/subread-2.0.6-source/bin/featureCounts ~/.local/bin/featureCounts
+```
+
+#### Python dependencies
+
+Caution this will use the system's pip and current pythonpath; using a virtualenv is advised.
+
+```
+cd /home/rock/main/module && \
+    pip install -r rock_n_roi_requirements.txt && \
+    pip install snakemake pandas
+
+```
+
+#### Running the method
+
+```
+cd main
+snakemake --cores 50 --configfile config.yaml
+
 ```
 
 ## Usage tips

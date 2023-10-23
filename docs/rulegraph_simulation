@@ -1,0 +1,43 @@
+#{'simulate': True, 'working_dir': 'work', 'Rbin': 'R', 'STAR': 'STAR', 'nthreads': 2, 'per_task_max_nthreads': 5, 'per_task_max_mem': 1038822112, 'gtf': 'work/data/genome.gtf', 'genome': 'work/data/genome.fa', 'sjdbOverhang': 100, 'run_mode': 'all', 'capture_gtf_column_2_pattern': 'captured', 'samples': [{'name': 'simulated', 'uses': {'cb_umi_fq': 'work/data/simulated/r1.fq.gz', 'cdna_fq': 'work/data/simulated/r2.fq.gz', 'whitelist': '96x3', 'expected_cells': 500}}, {'name': 'simulated2', 'uses': {'cb_umi_fq': 'work/data/simulated/r1.fq.gz', 'cdna_fq': 'work/data/simulated/r2.fq.gz', 'whitelist': '96x3', 'expected_cells': 500}}]}
+digraph snakemake_dag {
+    graph[bgcolor=white, margin=0];
+    node[shape=box, style=rounded, fontname=sans,                 fontsize=10, penwidth=2];
+    edge[penwidth=2, color=grey];
+	0[label = "all", color = "0.56 0.6 0.85", style="rounded"];
+	1[label = "generate_sce", color = "0.41 0.6 0.85", style="rounded"];
+	2[label = "align_tso", color = "0.15 0.6 0.85", style="rounded"];
+	3[label = "simulate_fastqs", color = "0.26 0.6 0.85", style="rounded"];
+	4[label = "simulate_fastqs_from_a_cell", color = "0.21 0.6 0.85", style="rounded"];
+	5[label = "index", color = "0.51 0.6 0.85", style="rounded"];
+	6[label = "simulate_gtf", color = "0.46 0.6 0.85", style="rounded"];
+	7[label = "simulate_genome", color = "0.00 0.6 0.85", style="rounded"];
+	8[label = "prepare_whitelists", color = "0.31 0.6 0.85", style="rounded"];
+	9[label = "align_wta", color = "0.36 0.6 0.85", style="rounded"];
+	10[label = "count_custom_regions_tso", color = "0.05 0.6 0.85", style="rounded"];
+	11[label = "create_config_file_for_custom_counting", color = "0.62 0.6 0.85", style="rounded"];
+	12[label = "subset_chromosomes_for_custom_counting", color = "0.10 0.6 0.85", style="rounded"];
+	1 -> 0
+	10 -> 1
+	6 -> 1
+	2 -> 1
+	9 -> 1
+	6 -> 2
+	3 -> 2
+	8 -> 2
+	5 -> 2
+	4 -> 3
+	7 -> 5
+	6 -> 5
+	3 -> 8
+	6 -> 9
+	3 -> 9
+	8 -> 9
+	5 -> 9
+	6 -> 10
+	2 -> 10
+	9 -> 10
+	11 -> 10
+	12 -> 11
+	2 -> 12
+	9 -> 12
+}            
