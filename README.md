@@ -53,7 +53,7 @@ snakemake -s main/Snakefile --configfile ~/src/rock_roi_paper/00_mixing_experime
 
 
 - Rulegraph: [png](./docs/simul.png), [specs](./docs/rulegraph_simulation)
-- DAG: [specs](.docs/dag_simulation) (beware hundreds of cells)
+- DAG: [specs](.docs/dag_simulation.gz) (gzip compressed- hundreds of cells)
 
 ## Installs and/or running the method
 
