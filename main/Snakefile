@@ -457,7 +457,8 @@ rule subset_chromosomes_for_custom_counting:
     output:
         red_tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
         red_wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
-        chrs = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'captured_chrs.txt'))
+        chrs = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'captured_chrs.txt')),
+        
     threads: 10        
     params:
         gtf = config['gtf'],
@@ -466,9 +467,16 @@ rule subset_chromosomes_for_custom_counting:
     run:
         if params.run_mode in ['all', 'tso ontarget multi']:
             shell ("""
-            grep {params.capture_gtf_column_2_pattern} {params.gtf} | cut -f1 | sort | uniq  > {output.chrs}
-            samtools view {input.tso_bam} {output.chrs} -@ {threads} | samtools view -Sb > {output.red_tso_bam}
-            samtools view {input.wta_bam} {output.chrs} -@ {threads} | samtools view -Sb > {output.red_wta_bam}
+            grep {params.pattern} {params.gtf} | cut -f1 | sort | uniq  > {output.chrs}
+            captured=$(cat {output.chrs} | tr '\n' ' ')
+
+            samtools index -@ {threads} {input.tso_bam}
+            samtools index -@ {threads} {input.wta_bam}
+
+            samtools view -h {input.tso_bam}  $captured -@ {threads} | \
+                samtools view -Sb > {output.red_tso_bam}
+            samtools view -h {input.wta_bam} $captured -@ {threads} | \
+                samtools view -Sb > {output.red_wta_bam}
             """)
 
 
@@ -547,8 +555,8 @@ EOF
         
 rule count_custom_regions_tso:
     input:
-        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
+        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
         config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
         gtf = config['gtf']
     output:
