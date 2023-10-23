@@ -489,12 +489,12 @@ rule create_config_file_for_custom_counting:
         config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml')
     threads: 10        
     params:
-        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
+        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
         gtf = config['gtf'],
         fc = 'featureCounts',
-        parsing_threads = 10,
-        fc_threads = 10,
+        parsing_threads = 2,
+        fc_threads = 2,
         path = op.join(config['working_dir'], 'multimodal', '{sample}/'), ## mind the last slash
         output_bam_fn = '{sample}_tso_and_wta.bam',
         seqlogo = op.join(config['working_dir'], 'multimodal', '{sample}', 'seqlogo.png'),
