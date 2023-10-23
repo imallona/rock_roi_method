@@ -46,14 +46,14 @@ We also provide a simulation runmode to showcase the method, where raw reads (fa
 snakemake -s main/Snakefile --configfile ~/src/rock_roi_paper/00_mixing_experiment/mixing_conf.yaml  --dag
 ```
 
-- Rulegraph: [png](./data/rulegraph.png), [pdf](./data/rulegraph.pdf), [specs](./data/rulegraph).
-- DAG for a run with four samples: [png](./data/dag.png), [pdf](./data/rulegraph.pdf), [specs](./data/rulegraph).
+- Rulegraph: [png](./docs/rulegraph.png), [pdf](./docs/rulegraph.pdf), [specs](./docs/rulegraph).
+- DAG for a run with four samples: [png](./docs/dag.png), [pdf](./docs/rulegraph.pdf), [specs](./docs/rulegraph).
 
 ### With simulation
 
 
-- Rulegraph: [png](./data/simul.png), [specs](./data/rulegraph_simulation)
-- DAG: [specs](.data/dag_simulation) (beware hundreds of cells)
+- Rulegraph: [png](./docs/simul.png), [specs](./docs/rulegraph_simulation)
+- DAG: [specs](.docs/dag_simulation) (beware hundreds of cells)
 
 ## Installs and/or running the method
 
