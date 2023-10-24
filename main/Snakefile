@@ -186,10 +186,12 @@ ontarget\tcaptured\texon\t1030\t1090\t.\t+\t.\tgene_id "ontarget_2"; transcript_
 
 rule simulate_fastqs:
     input:
-        part_r1 = expand(op.join(config['working_dir'], 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz'),
+        part_r1 = expand(op.join(config['working_dir'], 'data', '{sample}',
+                                 'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz'),
                          sample = get_sample_names(),
                          cb1 = cb1s, cb2 = cb2s, cb3 = cb3s, umi = umis),
-        part_r2 = expand(op.join(config['working_dir'], 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'),
+        part_r2 = expand(op.join(config['working_dir'], 'data', '{sample}',
+                                 'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'),
                          sample = get_sample_names(),
                          cb1 = cb1s, cb2 = cb2s, cb3 = cb3s, umi = umis)
     params:
@@ -215,8 +217,10 @@ cat {input.part_r2} {output.r2_extra} > {output.r2}
 ## r2 is the cb + umi        
 rule simulate_fastqs_from_a_cell:
     output:
-        part_r1 =  temp(op.join(config['working_dir'], 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz')),
-        part_r2 =  temp(op.join(config['working_dir'], 'data', '{sample}', 'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'))
+        part_r1 =  temp(op.join(config['working_dir'], 'data', '{sample}',
+                                'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz')),
+        part_r2 =  temp(op.join(config['working_dir'], 'data', '{sample}',
+                                'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'))
     params:
         path = op.join(config['working_dir'], 'data', '{sample}'),
         tso_fix1 = "AATG",
@@ -450,6 +454,7 @@ rule align_tso:
         """
 
 ## this is a dirty workaround to reduce mem usage by selecting which chromosomes have 'captured' features
+## @todo dedup and use wildcard for modality
 rule subset_chromosomes_for_custom_counting:
     input:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
@@ -457,8 +462,9 @@ rule subset_chromosomes_for_custom_counting:
     output:
         red_tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
         red_wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
-        chrs = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'captured_chrs.txt')),
-        
+        # temp_red_tso_bam = temp(op.join(config['working_dir'], 'align_tso', '{sample}', 'temp_subset_tso.bam')),
+        # temp_red_wta_bam = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'temp_subset_wta.bam')),
+        chrs = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'captured_chrs.txt'))        
     threads: 10        
     params:
         gtf = config['gtf'],
@@ -477,23 +483,52 @@ rule subset_chromosomes_for_custom_counting:
                 samtools view -Sb > {output.red_tso_bam}
             samtools view -h {input.wta_bam} $captured -@ {threads} | \
                 samtools view -Sb > {output.red_wta_bam}
+
+            # ## plus rehead
+            # samtools view -H [output.red_tso_bam] | \
+            #   grep  -e "HD\|PG\|CO"  -f [output.chrs] | \
+            #   samtools reheader --no-PG - [output.red_tso_bam] > [output.temp_red_tso_bam]
+
+            # samtools view -H [output.red_wta_bam] | \
+            #   grep  -e "HD\|PG\|CO"  -f [output.chrs] | \
+            #   samtools reheader --no-PG - [output.red_wta_bam] > [output.temp_red_wta_bam]
+
+            # cp [output.temp_red_tso_bam]  [output.red_tso_bam]
+            # cp [output.temp_red_wta_bam]  [output.red_wta_bam]
+
+            # samtools index -@ [threads] [output.red_tso_bam]
+            # samtools index -@ [threads] [output.red_wta_bam]
             """)
 
 
-    
+rule subset_gtf_for_custom_counting:
+    input:
+        gtf = config['gtf']
+    output:
+        subset_gtf = temp(op.join(config['working_dir'], 'multimodal', 'subset.gtf'))
+    threads: 10
+    params:
+        pattern = config['capture_gtf_column_2_pattern']
+    shell:
+        """
+        grep {params.pattern} {input.gtf} > {output.subset_gtf}
+        """
+        
+        
 rule create_config_file_for_custom_counting:
     input:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
-        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam')
+        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
+        gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
     output:
         config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml')
     threads: 10        
     params:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
-        gtf = config['gtf'],
+        gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf'),
         fc = 'featureCounts',
-        parsing_threads = 2,
+        parsing_threads = 5,
         fc_threads = 2,
         path = op.join(config['working_dir'], 'multimodal', '{sample}/'), ## mind the last slash
         output_bam_fn = '{sample}_tso_and_wta.bam',
@@ -516,8 +551,8 @@ featureCounts_path: {params.fc}
 
 # input parameters
 linker_pattern_for_seq_logo: ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC) # tso pattern to get tso tail seq logo
-linker_pattern_list:                  # list of linkers to be matched with alignment. If no match then CB tag is recovered where possible.
-  - ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC)     # tso linkers
+linker_pattern_list:                              # list of linkers to be matched with alignment. If no match then CB tag is recovered where possible.
+  - ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC)             # tso linkers
   - ^(A|GT|TCA)?([A-Z]{{9}})(GTGA[A-Z]{{9}}GACA)  # wta linkers
 seq_logo_filename: {params.seqlogo}
 cb1_len: 9                            # length of first part of CB tag
@@ -534,7 +569,8 @@ rg_tag_names:
   - tso 
 
 chromosomes:                            # chromosomes to be processed (None means all of them)
-  - None
+  - tdtomato
+  - egfp
 
 subset_gtf: 1                           # subset gtf file by pattern (1: yes, 0: no)
 subset_gtf_output_file: ontarget.gtf    # output file name of subset of gtf file
@@ -558,10 +594,14 @@ rule count_custom_regions_tso:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
         config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
-        gtf = config['gtf']
+        #gtf = config['gtf'],
+        gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
     output:
         merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
         fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted')
+    threads: 10
+    resources:
+         mem_mb=100000
     params:
         module_path = op.join('module', 'src', 'main'),
         run_mode = config['run_mode']
@@ -571,7 +611,7 @@ rule count_custom_regions_tso:
             # cd {params.module_path}
             ln -s -f {params.module_path} .
             ln -s -f {params.module_path}/../utilities .
-            python -m  main.combined_rock_roi --config {input.config}
+            python -m  main.combined_rock_roi --config {input.config} &> /dev/null
             """)
 
 rule generate_sce:

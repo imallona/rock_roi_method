@@ -121,7 +121,10 @@ def main():
         # print(chromosomes)
         # print(input_bam.header["SQ"])
         chromosomes = [x['SN'] for x in input_bam.header["SQ"]]
-        
+        ## we also subset for those within the 'chromosomes' yaml file
+        if args['chromosomes'] is not None:
+            chromosomes = [x for x in chromosomes if x in args['chromosomes']]
+        print(chromosomes)
         ## patch end
         
         for chr_name in chromosomes:
