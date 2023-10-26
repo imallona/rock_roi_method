@@ -72,7 +72,7 @@ chromosomes:                          # chromosomes to be processed
   - ontarget
   - offtarget
 
-subset_gtf: 0                         # subset gtf file by pattern (1: yes, 0: no)
+subset_gtf: 1                         # subset gtf file by pattern (1: yes, 0: no)
 subset_gtf_output_file: subset.gtf    # output file name of subset of gtf file
 subset_gtf_pattern: 'alien'           # filter gtf file by this pattern if subset_gtf = 1
 write_final_bam_to_csv: 1             # write final merged bam file to a csv file(1: yes, 0: no)
