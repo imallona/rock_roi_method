@@ -67,7 +67,7 @@ rule all:
     input:
         expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
                sample = get_sample_names()),
-        expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_tso_coverage_bw'),
+        expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_coverage.bw'),
                modality = ['tso', 'wta'],
                sample = get_sample_names())
     
@@ -456,6 +456,7 @@ rule align_tso:
         rm -rf {params.tmp}
         """
 
+        
 ## this is a dirty workaround to reduce mem usage by selecting which chromosomes have 'captured' features
 ## @todo dedup and use wildcard for modality
 rule subset_chromosomes_for_custom_counting:
@@ -563,6 +564,7 @@ rg_tag_names:
   - tso 
 
 chromosomes:                            # chromosomes to be processed (None means all of them)
+  - chr5
   - tdtomato
   - egfp
 
@@ -622,7 +624,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_filt.bam')),
         cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')),
         header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'header')),
-        bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_tso_coverage_bw')
+        bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_coverage.bw')
     shell:
         """
         ## first filter in 'valid' CBs
@@ -651,47 +653,48 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         
         """
 
-# def materialize_query_cb_file(cb_list, fn):
-#     with
+rule create_deduped_coverage_tracks_single_cb:
+    input:
+        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+                                 'filtered', 'barcodes.tsv')
+    threads:
+        config['nthreads']
+    params:
+        bamCoverage = config['bamCoverage'],
+        binSize = 10
+    output:
+        cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_{cell}_filt.bam')),
+        cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                 'cb_{cell}_ub_filt.bam')),
+        header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', '_{cell}_header')),
+        bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_cb_{cell}_coverage.bw')
+    shell:
+        """
+        ## first filter in the query CB
+        samtools view -h -@ {threads} {input.bam} -d CB:{wildcards.cell} \
+           -o {output.cb_bam}
 
-# rule create_deduped_coverage_track_for_query_cbs:
-#     input:
-#         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-#         cbs = "query_cb_list.txt"
-#     threads:
-#         config['nthreads']
-#     params:
-#         bamCoverage = config['bamCoverage'],
-#         binSize = 10
-#     output:
-#         cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_filt.bam')),
-#         cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')),
-#         header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'header')),
-#         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_tso_coverage_bw')
-#     shell:
-#         """
-#         ## first filter in 'valid' CBs
+        ## second, deduplicate by UB (error corrected barcodes)
+        ##  so it gets only one alignment per UB:locus:CB combination
+        # 27 CB (error corrected CB; the only CB being queried)
+        # 28 UB (error corrected UMI)
+        # mind the file is coordinate sorted already - so we deduplicate based on columns 27 and 28
+        samtools view -H {output.cb_bam} > {output.header}
 
-#         ## CB are the error-corrected barcodes
-#         samtools view -h -@ {threads} {input.wta_bw} -D CB:{input.valid_barcodes} \
-#            -o /data_folder/data.barcodes.bam 
+        samtools view -h {output.cb_bam} -@ {threads} | uniq -f26 | cat {output.header} - | \
+          samtools view -Sb -@ {threads} > {output.cb_ub_bam}
 
-#         ## second, deduplicate by UB (error corrected barcodes)
-#         ##  so it gets only one alignment per UB:locus:CB combination
-#         # 3 contig
-#         # 4 start
-#         # 20 gz (gene)
-#         # 27 CB (error corrected CB)
-#         # 28 UB (error corrected UMI)
-#         samtools view -H {output.cb_bam} > {output.header}
-#         samtools view -h {output.cb_bam} -@ {threads} | uniq -c 3,4,20,27,28 | cat {output.header} - | \
-#           samtools view -H -@ {threads} > {output.cb_ub_bam}
+        samtools index -@ {threads} {output.cb_ub_bam}
 
-#         # deeptools it, no normalization
-#         {params.bamCoverage} -b {output.cb_ub_bam} \
-#           -o {output.bw} --binSize {params.binSize}
+        # deeptools coverage it, no normalization
+        {params.bamCoverage} --numberOfProcessors {threads} \
+          -b {output.cb_ub_bam} \
+          --normalizeUsing None \
+          -o {output.bw} --binSize {params.binSize}
         
-#         """
+        """
+        
         
 rule generate_sce:
     input:
