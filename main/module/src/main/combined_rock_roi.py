@@ -24,11 +24,14 @@ parser = argparse.ArgumentParser(description='')
 parser.add_argument('--config', metavar='config', type=str,
                     help='full path to the config file')
 
-# parser.add_argument('--wta_bam', metavar='config', type=str,
-#                     help='WTA bam file')
+parser.add_argument('--sample', metavar='sample_id', type=str,
+                    help='sample id matching the config file')
 
-# parser.add_argument('--tso_bam', metavar='config', type=str,
-#                     help='TSO bam file')
+parser.add_argument('--wta_bam', metavar='wta_bam', type=str,
+                    help='wta bam')
+
+parser.add_argument('--tso_bam', metavar='tso_bam', type=str,
+                    help='tso bam')
 
 # ## all other config items from the yaml
 
@@ -46,10 +49,17 @@ def main():
         with open(config_path) as cf_file:
             args = yaml.safe_load(cf_file.read())
 
-        input_bam_file_paths = args['input_bam_file_paths']
-        unique_cb_bamfile_list = args['unique_cb_bamfile_list']
-        gtf_file = args['gtf_file']
-        featureCounts_path = args['featureCounts_path']
+        print(args)
+        
+        sample = cmdargs.sample
+        
+        input_bam_file_paths = [cmdargs.wta_bam, cmdargs.tso_bam] 
+        ## not needed anymore, the bamfile is filtered already via snmk
+        unique_cb_bamfile_list = cmdargs.wta_bam
+        
+        gtf_file = args['gtf']
+        featureCounts_path = args['featureCounts']
+        
         linker_pattern_for_seq_logo = args['linker_pattern_for_seq_logo']
         linker_pattern_list = args['linker_pattern_list']
         seq_logo_filename = args['seq_logo_filename']
@@ -61,19 +71,24 @@ def main():
         umi_len = args['umi_len']
         chunk_genomic_area = args['chunk_genomic_area']
         rg_tag_names = args['rg_tag_names']
+
         chromosomes = args['chromosomes']
         subset_gtf = args['subset_gtf']
-        output_folder = args['output_folder']
-        subset_gtf_output_file = output_folder + args['subset_gtf_output_file']
+        # output_folder = args['output_folder']
+        ## the ending '/' is a requirement by Nidhi's code
+        output_folder = os.path.join(args['working_dir'], 'multimodal', cmdargs.sample + '/')
+        
+        subset_gtf_output_file = os.path.join(output_folder, args['subset_gtf_output_file'])
         subset_gtf_pattern = args['subset_gtf_pattern']
         write_final_bam_to_csv = args['write_final_bam_to_csv']
         write_final_bam_header_to_txt = args['write_final_bam_header_to_txt']
         nProcessors = args['nProcessors']
         nthreads = args['nthreads']
-        final_merged_file = output_folder + args['final_merged_file']
-        featureCounts_output_file = output_folder + args['featureCounts_output_file']
-        log_file = output_folder + args['log_file']
-        error_log = output_folder + args['error_log']
+
+        final_merged_file = os.path.join(output_folder, args['final_merged_file'])
+        featureCounts_output_file = os.path.join(output_folder, args['featureCounts_output_file'])
+        log_file = os.path.join(output_folder, args['log_file'])
+        error_log = os.path.join(output_folder, args['error_log'])
 
         pathlib.Path(output_folder).mkdir(parents=True, exist_ok=True)
         print('Done!\n')
@@ -122,7 +137,7 @@ def main():
                 chromosomes = h_chromosomes
                 print('Requested chr to be counted do not overlap the BAM header, counting instead: ' + ' '.join(chromosomes))
 
-        
+                
         print('Done!\n')
 
         ######################### End: setting up input and output files/parameters #########################
@@ -282,6 +297,7 @@ def main():
                                 -M  \
                                 -T {nthreads} \
                                 --byReadGroup"
+        print('\n with command ' + featurecounts_cmd)
         os.system(featurecounts_cmd)
         print('- Done!\n')
 
