@@ -13,14 +13,14 @@ WORKDIR /home/rock
 COPY ./data data/
 COPY ./main main/
 
-## rockandroi python module install
+## rockandroi python module install along with snakemake and deeptools
 
 RUN cd /home/rock/main/module && \
     pip install -r rock_n_roi_requirements.txt && \
     mkdir -p data && \
-    pip install snakemake pandas
+    pip install snakemake pandas deeptools
 
-# STAR, subread, SingleCellExperiment installs
+# STAR, subread and SingleCellExperiment installs
 
 RUN mkdir -p /home/rock/soft/star && \
     cd /home/rock/soft/star && \
@@ -45,5 +45,5 @@ RUN echo "export PATH=$PATH" >> ~/.bashrc
 
 ## showcase the method with simulated data and using snakemake
 
-RUN cd /home/rock/main && \
-     snakemake --cores 1 --configfile config.yaml 
+## RUN cd /home/rock/main && \
+##      snakemake --cores 1 --configfile config.yaml 

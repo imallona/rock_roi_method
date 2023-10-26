@@ -72,9 +72,9 @@ read_featurecounts <- function(fn, wta_whitelist) {
     mtso <- mtso[,grep('tso', colnames(mtso))]
     colnames(mtso) <- gsub('tso_', '', colnames(mtso))
 
-    ## append NAs for non-detected CBs
+    ## append 0s instead of NAs for non-detected CBs
     if (!all(wta_whitelist %in% colnames(mtso))) {
-        empty <- matrix(nrow = nrow(mtso), ncol = length(setdiff(wta_whitelist, colnames(mtso))), data = NA)
+        empty <- matrix(nrow = nrow(mtso), ncol = length(setdiff(wta_whitelist, colnames(mtso))), data = 0)
         colnames(empty) <- setdiff(wta_whitelist, colnames(mtso))
         rownames(empty) <- rownames(mtso)
     

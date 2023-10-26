@@ -1,6 +1,6 @@
 #!/usr/bin/env snakemake -s
 ##
-## Snakefile to process rock/roi data
+## Snakefile to process rock/roi data (general method)
 ##
 ## Started 11th Oct 2023
 ##
@@ -66,6 +66,9 @@ umis = ['AACCTTGG', 'CCGGTTAA', 'TTGGCCAA', 'GACATAGG']
 rule all:
     input:
         expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
+               sample = get_sample_names()),
+        expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_tso_coverage_bw'),
+               modality = ['tso', 'wta'],
                sample = get_sample_names())
     
 rule index:
@@ -457,47 +460,38 @@ rule align_tso:
 ## @todo dedup and use wildcard for modality
 rule subset_chromosomes_for_custom_counting:
     input:
-        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam')
+        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam')
     output:
-        red_tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
-        red_wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
-        # temp_red_tso_bam = temp(op.join(config['working_dir'], 'align_tso', '{sample}', 'temp_subset_tso.bam')),
+        red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam'),
+        # temp_red_bam = temp(op.join(config['working_dir'], 'align_tso', '{sample}', 'temp_subset_tso.bam')),
         # temp_red_wta_bam = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'temp_subset_wta.bam')),
-        chrs = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'captured_chrs.txt'))        
+        chrs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'captured_chrs.txt'))        
     threads: 10        
     params:
         gtf = config['gtf'],
         run_mode = config['run_mode'],
-        pattern = config['capture_gtf_column_2_pattern']
+        pattern = config['capture_gtf_column_2_pattern'],
+        temp_red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                               'tmp_subset_{modality}.bam')
     run:
         if params.run_mode in ['all', 'tso ontarget multi']:
             shell ("""
             grep {params.pattern} {params.gtf} | cut -f1 | sort | uniq  > {output.chrs}
-            captured=$(cat {output.chrs} | tr '\n' ' ')
+            captured=$(cat {output.chrs} | tr '\\n' ' ')
 
-            samtools index -@ {threads} {input.tso_bam}
-            samtools index -@ {threads} {input.wta_bam}
+            samtools index -@ {threads} {input.bam}
 
-            samtools view -h {input.tso_bam}  $captured -@ {threads} | \
-                samtools view -Sb > {output.red_tso_bam}
-            samtools view -h {input.wta_bam} $captured -@ {threads} | \
-                samtools view -Sb > {output.red_wta_bam}
+            samtools view -h {input.bam}  $captured -@ {threads} | \
+                samtools view -Sb > {output.red_bam}
 
-            # ## plus rehead
-            # samtools view -H [output.red_tso_bam] | \
+            ## plus rehead; this does not work due to the chromosome ordering
+            # samtools view -H [output.red_bam] | \
             #   grep  -e "HD\|PG\|CO"  -f [output.chrs] | \
-            #   samtools reheader --no-PG - [output.red_tso_bam] > [output.temp_red_tso_bam]
+            #   samtools reheader --no-PG - [output.red_bam] > [params.temp_red_bam]
 
-            # samtools view -H [output.red_wta_bam] | \
-            #   grep  -e "HD\|PG\|CO"  -f [output.chrs] | \
-            #   samtools reheader --no-PG - [output.red_wta_bam] > [output.temp_red_wta_bam]
+            # mv [params.temp_red_bam]  [output.red_bam]
 
-            # cp [output.temp_red_tso_bam]  [output.red_tso_bam]
-            # cp [output.temp_red_wta_bam]  [output.red_wta_bam]
-
-            # samtools index -@ [threads] [output.red_tso_bam]
-            # samtools index -@ [threads] [output.red_wta_bam]
+            # samtools index -@ [threads] [output.red_bam]
             """)
 
 
@@ -611,9 +605,94 @@ rule count_custom_regions_tso:
             # cd {params.module_path}
             ln -s -f {params.module_path} .
             ln -s -f {params.module_path}/../utilities .
-            python -m  main.combined_rock_roi --config {input.config} &> /dev/null
+            python -m  main.combined_rock_roi --config {input.config}
             """)
 
+rule create_deduped_coverage_tracks_all_filtered_in_cbs:
+    input:
+        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+                                 'filtered', 'barcodes.tsv')
+    threads:
+        config['nthreads']
+    params:
+        bamCoverage = config['bamCoverage'],
+        binSize = 10
+    output:
+        cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_filt.bam')),
+        cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')),
+        header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'header')),
+        bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_tso_coverage_bw')
+    shell:
+        """
+        ## first filter in 'valid' CBs
+
+        ## CB are the error-corrected barcodes
+        samtools view -h -@ {threads} {input.bam} -D CB:{input.valid_barcodes} \
+           -o {output.cb_bam}
+
+        ## second, deduplicate by UB (error corrected barcodes)
+        ##  so it gets only one alignment per UB:locus:CB combination
+        # 27 CB (error corrected CB)
+        # 28 UB (error corrected UMI)
+        # mind the file is coordinate sorted already - so we deduplicate based on columns 27 and 28
+        samtools view -H {output.cb_bam} > {output.header}
+
+        samtools view -h {output.cb_bam} -@ {threads} | uniq -f26 | cat {output.header} - | \
+          samtools view -Sb -@ {threads} > {output.cb_ub_bam}
+
+        samtools index -@ {threads} {output.cb_ub_bam}
+
+        # deeptools coverage it, no normalization
+        {params.bamCoverage} --numberOfProcessors {threads} \
+          -b {output.cb_ub_bam} \
+          --normalizeUsing None \
+          -o {output.bw} --binSize {params.binSize}
+        
+        """
+
+# def materialize_query_cb_file(cb_list, fn):
+#     with
+
+# rule create_deduped_coverage_track_for_query_cbs:
+#     input:
+#         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+#         cbs = "query_cb_list.txt"
+#     threads:
+#         config['nthreads']
+#     params:
+#         bamCoverage = config['bamCoverage'],
+#         binSize = 10
+#     output:
+#         cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_filt.bam')),
+#         cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')),
+#         header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'header')),
+#         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_tso_coverage_bw')
+#     shell:
+#         """
+#         ## first filter in 'valid' CBs
+
+#         ## CB are the error-corrected barcodes
+#         samtools view -h -@ {threads} {input.wta_bw} -D CB:{input.valid_barcodes} \
+#            -o /data_folder/data.barcodes.bam 
+
+#         ## second, deduplicate by UB (error corrected barcodes)
+#         ##  so it gets only one alignment per UB:locus:CB combination
+#         # 3 contig
+#         # 4 start
+#         # 20 gz (gene)
+#         # 27 CB (error corrected CB)
+#         # 28 UB (error corrected UMI)
+#         samtools view -H {output.cb_bam} > {output.header}
+#         samtools view -h {output.cb_bam} -@ {threads} | uniq -c 3,4,20,27,28 | cat {output.header} - | \
+#           samtools view -H -@ {threads} > {output.cb_ub_bam}
+
+#         # deeptools it, no normalization
+#         {params.bamCoverage} -b {output.cb_ub_bam} \
+#           -o {output.bw} --binSize {params.binSize}
+        
+#         """
+        
 rule generate_sce:
     input:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),

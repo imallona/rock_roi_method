@@ -23,6 +23,15 @@ import argparse
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('--config', metavar='config', type=str,
                     help='full path to the config file')
+
+# parser.add_argument('--wta_bam', metavar='config', type=str,
+#                     help='WTA bam file')
+
+# parser.add_argument('--tso_bam', metavar='config', type=str,
+#                     help='TSO bam file')
+
+# ## all other config items from the yaml
+
 cmdargs = parser.parse_args()
 
 def main():
@@ -92,16 +101,28 @@ def main():
                 pysam.index(file)
             else:
                 print('Bam file {} is already sorted and indexed'.format(file))
-            bam.close()
+                bam.close()
         print('Done!\n')
         
         # check if chromosomes is provided else get all chromosomes from first input bam file header
         # open first input bam file
         print('Setting up chromosome names to be processed...')
         input_bam = pysam.AlignmentFile(input_bam_file_paths[0], "rb")
+        header = input_bam.header
+        h_chromosomes = [ref['SN'] for ref in header['SQ']]
         if chromosomes is None:
-            header = input_bam.header
-            chromosomes = [ref['SN'] for ref in header['SQ']]
+            chromosomes = h_chromosomes
+            print('Chromosomes being counted are the ones from the bam header, no subsetting: ' + ' '.join(chromosomes))
+        else:           
+            overlap = [x for x in h_chromosomes if x in args['chromosomes']]
+            if len(overlap) > 0:
+                chromosomes = overlap
+                print('Chromosomes being counted are the requested (configfile): ' + ' '.join(chromosomes))
+            else:
+                chromosomes = h_chromosomes
+                print('Requested chr to be counted do not overlap the BAM header, counting instead: ' + ' '.join(chromosomes))
+
+        
         print('Done!\n')
 
         ######################### End: setting up input and output files/parameters #########################
@@ -116,16 +137,16 @@ def main():
         print('Getting genomic length of chromosome...')
         chr_length_dict = {}
 
-        ## patch to retrievel chr_names when inputted as `None` within the `chromosomes` yaml field
+        # ## patch to retrievel chr_names when inputted as `None` within the `chromosomes` yaml field
         
+        # # print(chromosomes)
+        # # print(input_bam.header["SQ"])
+        # chromosomes = [x['SN'] for x in input_bam.header["SQ"]]
+        # ## we also subset for those within the 'chromosomes' yaml file
+        # if args['chromosomes'] is not None:
+        #     chromosomes = [x for x in chromosomes if x in args['chromosomes']]
         # print(chromosomes)
-        # print(input_bam.header["SQ"])
-        chromosomes = [x['SN'] for x in input_bam.header["SQ"]]
-        ## we also subset for those within the 'chromosomes' yaml file
-        if args['chromosomes'] is not None:
-            chromosomes = [x for x in chromosomes if x in args['chromosomes']]
-        print(chromosomes)
-        ## patch end
+        # ## patch end
         
         for chr_name in chromosomes:
             chr_length_dict[chr_name] = get_reference_length(input_bam.header["SQ"], chr_name)

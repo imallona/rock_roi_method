@@ -111,12 +111,14 @@ ln -s  ~/soft/soft/subread/subread-2.0.6-source/bin/featureCounts ~/.local/bin/f
 
 #### Python dependencies
 
+Including snakemake, pandas and deeptools.
+
 Caution this will use the system's pip and current pythonpath; using a virtualenv is advised.
 
 ```
 cd /home/rock/main/module && \
     pip install -r rock_n_roi_requirements.txt && \
-    pip install snakemake pandas
+    pip install snakemake pandas deeptools
 
 ```
 

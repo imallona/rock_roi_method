@@ -7,6 +7,7 @@ working_dir: work
 ## software stack, will work out of the box if within the supplied docker container
 Rbin: R
 STAR: STAR
+bamCoverage: bamCoverage
 
 ## run limits
 nthreads: 2
@@ -44,3 +45,6 @@ samples:
       cdna_fq: work/data/simulated/r2.fq.gz
       whitelist: 96x3
       expected_cells: 500
+
+## module counting config
+
