@@ -56,6 +56,8 @@ def get_barcode_whitelist_by_name(name):
         if config['samples'][i]['name'] == name:
              return(config['samples'][i]['uses']['whitelist'])
 
+print(get_sample_names())
+         
 ## canonical CB 9-mers or just A{9}
 ## (used for simulations)
 cb1s = ['GTCGCTATA','CTTGTACTA','CTTCACATA','ACACGCCGG','CGGTCCAGG','AATCGAATG','CCTAGTATA']
@@ -284,14 +286,14 @@ def symlink_whitelist(sample):
     if get_barcode_whitelist_by_name(name = sample) == '96x3':
         for x in ['BD_CLS1.txt', 'BD_CLS2.txt', 'BD_CLS3.txt']:
             try:
-                os.symlink(src = op.join(os.getcwd(), '..', 'data', 'whitelist_96x3', x),
+                os.symlink(src = op.join(config['whitelist_path'], 'whitelist_96x3', x),
                            dst = op.join(config['working_dir'], 'align_wta', sample, 'whitelists', x))
             except FileExistsError:
                 break
     elif get_barcode_whitelist_by_name(name = sample) == '384x3':
         for x in ['BD_CLS1.txt', 'BD_CLS2.txt', 'BD_CLS3.txt']:
             try:
-                os.symlink(src = op.join(os.getcwd(), '..', 'data', 'whitelist_384x3', x),
+                os.symlink(src = op.join(config['whitelist_path'], 'whitelist_384x3', x),
                            dst = op.join(config['working_dir'], 'align_wta', sample, 'whitelists', x))
             except FileExistsError:
                 break
@@ -628,9 +630,10 @@ rule count_custom_regions_tso:
         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
     output:
         # merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
-        merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', config['final_merged_file']),
+        merged_bam = temp(op.join(config['working_dir'], 'multimodal', '{sample}', config['final_merged_file'])),
+        csv = temp(op.join(config['working_dir'], 'multimodal', '{sample}', 'final_bam_df.csv')),
         fc = op.join(config['working_dir'], 'multimodal', '{sample}', config['featureCounts_output_file'])
-    threads: 10
+    threads: max(config['nProcessors'], config['nthreads'])
     resources:
          mem_mb=100000
     params:
@@ -647,6 +650,8 @@ rule count_custom_regions_tso:
                 --sample {wildcards.sample} \
                 --wta_bam {input.wta_bam} \
                 --tso_bam {input.tso_bam}
+
+            touch {output.csv} ## in case it wasn't generated, this rather be a cleaned up by default
             """)
 
 rule create_deduped_coverage_tracks_all_filtered_in_cbs:
@@ -666,6 +671,9 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_coverage.bw')
     shell:
         """
+        ## this is unrelated to the bamgeneration; fixes starsolo's default permissions
+        chmod -R ug+rwX $(dirname {input.bam})
+
         ## first filter in 'valid' CBs
 
         ## CB are the error-corrected barcodes
@@ -733,8 +741,8 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
 #           -o {output.bw} --binSize {params.binSize}
         
 #         """
-        
-        
+
+
 rule generate_sce:
     input:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
@@ -762,3 +770,4 @@ rule generate_sce:
              --working_dir {params.working_dir} \
              --output_fn {output.sce}
         """
+

@@ -74,11 +74,11 @@ chromosomes:                          # chromosomes to be processed
 
 subset_gtf: 1                         # subset gtf file by pattern (1: yes, 0: no)
 subset_gtf_output_file: subset.gtf    # output file name of subset of gtf file
-subset_gtf_pattern: 'alien'           # filter gtf file by this pattern if subset_gtf = 1
+subset_gtf_pattern: 'captured'           # filter gtf file by this pattern if subset_gtf = 1
 write_final_bam_to_csv: 1             # write final merged bam file to a csv file(1: yes, 0: no)
 write_final_bam_header_to_txt: 1      # write final merged bam header to text file (1: yes, 0: no)
-nProcessors: 4                        # for multiprocessing
-nthreads: 4                           # for featureCounts
+nProcessors: 5                        # for BAMs multiprocessing
+nthreads: 5                           # for featureCounts
 
 
 # output file names and paths
