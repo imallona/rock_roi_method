@@ -56,6 +56,8 @@ def get_barcode_whitelist_by_name(name):
         if config['samples'][i]['name'] == name:
              return(config['samples'][i]['uses']['whitelist'])
 
+print(get_sample_names())
+         
 ## canonical CB 9-mers or just A{9}
 ## (used for simulations)
 cb1s = ['GTCGCTATA','CTTGTACTA','CTTCACATA','ACACGCCGG','CGGTCCAGG','AATCGAATG','CCTAGTATA']
@@ -217,7 +219,7 @@ cat {input.part_r1} {output.r1_extra} > {output.r1}
 cat {input.part_r2} {output.r2_extra} > {output.r2}
       """
 
-## r2 is the cb + umi        
+## notice we have a ~10x duplication rate (UMIs are reused multiple times)      
 rule simulate_fastqs_from_a_cell:
     output:
         part_r1 =  temp(op.join(config['working_dir'], 'data', '{sample}',
@@ -251,6 +253,14 @@ seq 11 20 | awk  ' {{print "@tso"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.
 seq 21 30 | awk ' {{print "@tso"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nATTCCAAACTTAGCTTCAGTTATAAATTCCCCTCCCATGATTGGGATTTTATAAACTTTTCTTCCATATAATTCATCTTTCTTCTCATAACCGTCTCCGAAAAACTTCAACTTAAATCCAACCTTTAACTGCTCATCA\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r1}
 
 seq 21 30 | awk ' {{print "@tso"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nG{wildcards.cb1}{params.tso_fix1}{wildcards.cb2}{params.tso_fix2}{wildcards.cb3}{wildcards.umi}TTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r2}
+
+## let's add one read for ontargets on WTA
+
+seq 31 32 | awk ' {{print "@wta"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nATTCCAAACTTAGCTTCAGTTATAAATTCCCCTCCCATGATTGGGATTTTATAAACTTTTCTTCCATATAATTCATCTTTCTTCTCATAACCGTCTCCGAAAAACTTCAACTTAAATCCAACCTTTAACTGCTCATCA\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r1}
+
+seq 31 32 | awk ' {{print "@wta"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nG{wildcards.cb1}{params.wta_fix1}{wildcards.cb2}{params.wta_fix2}{wildcards.cb3}{wildcards.umi}TTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r2}
+
+
       """
 
 # rule retrieve_whitelist:
@@ -276,14 +286,14 @@ def symlink_whitelist(sample):
     if get_barcode_whitelist_by_name(name = sample) == '96x3':
         for x in ['BD_CLS1.txt', 'BD_CLS2.txt', 'BD_CLS3.txt']:
             try:
-                os.symlink(src = op.join(os.getcwd(), '..', 'data', 'whitelist_96x3', x),
+                os.symlink(src = op.join(config['whitelist_path'], 'whitelist_96x3', x),
                            dst = op.join(config['working_dir'], 'align_wta', sample, 'whitelists', x))
             except FileExistsError:
                 break
     elif get_barcode_whitelist_by_name(name = sample) == '384x3':
         for x in ['BD_CLS1.txt', 'BD_CLS2.txt', 'BD_CLS3.txt']:
             try:
-                os.symlink(src = op.join(os.getcwd(), '..', 'data', 'whitelist_384x3', x),
+                os.symlink(src = op.join(config['whitelist_path'], 'whitelist_384x3', x),
                            dst = op.join(config['working_dir'], 'align_wta', sample, 'whitelists', x))
             except FileExistsError:
                 break
@@ -461,7 +471,8 @@ rule align_tso:
 ## @todo dedup and use wildcard for modality
 rule subset_chromosomes_for_custom_counting:
     input:
-        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam')
+        # bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam')
+        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')
     output:
         red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam'),
         # temp_red_bam = temp(op.join(config['working_dir'], 'align_tso', '{sample}', 'temp_subset_tso.bam')),
@@ -484,18 +495,43 @@ rule subset_chromosomes_for_custom_counting:
 
             samtools view -h {input.bam}  $captured -@ {threads} | \
                 samtools view -Sb > {output.red_bam}
-
-            ## plus rehead; this does not work due to the chromosome ordering
-            # samtools view -H [output.red_bam] | \
-            #   grep  -e "HD\|PG\|CO"  -f [output.chrs] | \
-            #   samtools reheader --no-PG - [output.red_bam] > [params.temp_red_bam]
-
-            # mv [params.temp_red_bam]  [output.red_bam]
-
-            # samtools index -@ [threads] [output.red_bam]
             """)
 
+# rule subset_cells_for_custom_counting:
+#     input:
+#         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_chr_{modality}.bam')
+#     output:
+#         cb_filt_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+#                               'subset_{modality}.bam')),
+#         chrs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'captured_chrs.txt'))        
+#     threads: 10        
+#     params:
+#         gtf = config['gtf'],
+#         run_mode = config['run_mode'],
+#         pattern = config['capture_gtf_column_2_pattern'],
+#         temp_red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}',
+#                                'tmp_subset_{modality}.bam')
+#     run:
+#         if params.run_mode in ['all', 'tso ontarget multi']:
+#             shell ("""
+#             grep {params.pattern} {params.gtf} | cut -f1 | sort | uniq  > {output.chrs}
+#             captured=$(cat {output.chrs} | tr '\\n' ' ')
 
+#             samtools index -@ {threads} {input.bam}
+
+#             samtools view -h {input.bam}  $captured -@ {threads} | \
+#                 samtools view -Sb > {output.red_bam}
+
+#             ## plus rehead; this does not work due to the chromosome ordering
+#             # samtools view -H [output.red_bam] | \
+#             #   grep  -e "HD\|PG\|CO"  -f [output.chrs] | \
+#             #   samtools reheader --no-PG - [output.red_bam] > [params.temp_red_bam]
+
+#             # mv [params.temp_red_bam]  [output.red_bam]
+
+#             # samtools index -@ [threads] [output.red_bam]
+#             """)
+    
 rule subset_gtf_for_custom_counting:
     input:
         gtf = config['gtf']
@@ -510,104 +546,112 @@ rule subset_gtf_for_custom_counting:
         """
         
         
-rule create_config_file_for_custom_counting:
-    input:
-        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
-        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
-        gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
-    output:
-        config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml')
-    threads: 10        
-    params:
-        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
-        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
-        gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf'),
-        fc = 'featureCounts',
-        parsing_threads = 5,
-        fc_threads = 2,
-        path = op.join(config['working_dir'], 'multimodal', '{sample}/'), ## mind the last slash
-        output_bam_fn = '{sample}_tso_and_wta.bam',
-        seqlogo = op.join(config['working_dir'], 'multimodal', '{sample}', 'seqlogo.png'),
-        capture_pattern = config['capture_gtf_column_2_pattern'],
-        run_mode = config['run_mode']
-    run:
-        if params.run_mode in ['all', 'tso ontarget multi']:
-            shell ("""
-mkdir -p {params.path}
-cat <<EOF > {output.config}
-# input file paths
-input_bam_file_paths: 
-  - {params.wta_bam}
-  - {params.tso_bam}
-unique_cb_bamfile_list:               # for valid cell bar codes extraction
-  - {params.wta_bam}
-gtf_file: {params.gtf}
-featureCounts_path: {params.fc}
+# rule create_config_file_for_custom_counting:
+#     input:
+#         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
+#         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
+#         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
+#     output:
+#         config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml')
+#     threads: 10        
+#     params:
+#         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
+#         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
+#         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf'),
+#         fc = 'featureCounts',
+#         parsing_threads = 5,
+#         fc_threads = 2,
+#         path = op.join(config['working_dir'], 'multimodal', '{sample}/'), ## mind the last slash
+#         output_bam_fn = '{sample}_tso_and_wta.bam',
+#         seqlogo = op.join(config['working_dir'], 'multimodal', '{sample}', 'seqlogo.png'),
+#         capture_pattern = config['capture_gtf_column_2_pattern'],
+#         run_mode = config['run_mode']
+#     run:
+#         if params.run_mode in ['all', 'tso ontarget multi']:
+#             shell ("""
+# mkdir -p {params.path}
+# cat <<EOF > {output.config}
+# # input file paths
+# input_bam_file_paths: 
+#   - {params.wta_bam}
+#   - {params.tso_bam}
+# unique_cb_bamfile_list:               # for valid cell bar codes extraction
+#   - {params.wta_bam}
+# gtf_file: {params.gtf}
+# featureCounts_path: {params.fc}
 
-# input parameters
-linker_pattern_for_seq_logo: ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC) # tso pattern to get tso tail seq logo
-linker_pattern_list:                              # list of linkers to be matched with alignment. If no match then CB tag is recovered where possible.
-  - ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC)             # tso linkers
-  - ^(A|GT|TCA)?([A-Z]{{9}})(GTGA[A-Z]{{9}}GACA)  # wta linkers
-seq_logo_filename: {params.seqlogo}
-cb1_len: 9                            # length of first part of CB tag
-cb2_len: 9                            # length of second part of CB tag
-cb3_len: 9                            # length of third part of CB tag
-linker_left_len: 4                    # length of linker on left
-linker_right_len: 4                   # length of linker on right
-umi_len: 8                            # length of UMI in sS tag
-chunk_genomic_area: 1000              # number of base pairs to be processed by each process in multiprocessing
+# # input parameters
+# linker_pattern_for_seq_logo: ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC) # tso pattern to get tso tail seq logo
+# linker_pattern_list:                              # list of linkers to be matched with alignment. If no match then CB tag is recovered where possible.
+#   - ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC)             # tso linkers
+#   - ^(A|GT|TCA)?([A-Z]{{9}})(GTGA[A-Z]{{9}}GACA)  # wta linkers
+# seq_logo_filename: {params.seqlogo}
+# cb1_len: 9                            # length of first part of CB tag
+# cb2_len: 9                            # length of second part of CB tag
+# cb3_len: 9                            # length of third part of CB tag
+# linker_left_len: 4                    # length of linker on left
+# linker_right_len: 4                   # length of linker on right
+# umi_len: 8                            # length of UMI in sS tag
+# chunk_genomic_area: 1000              # number of base pairs to be processed by each process in multiprocessing
 
-# NOTE: number of rg tag names must be equal to the number of input bam files and in the order of input bam files
-rg_tag_names:
-  - wta
-  - tso 
+# # NOTE: number of rg tag names must be equal to the number of input bam files and in the order of input bam files
+# rg_tag_names:
+#   - wta
+#   - tso 
 
-chromosomes:                            # chromosomes to be processed (None means all of them)
-  - chr5
-  - tdtomato
-  - egfp
+# chromosomes:                            # chromosomes to be processed (None means all of them)
+#   - chr5
+#   - tdtomato
+#   - egfp
 
-subset_gtf: 1                           # subset gtf file by pattern (1: yes, 0: no)
-subset_gtf_output_file: ontarget.gtf    # output file name of subset of gtf file
-subset_gtf_pattern: {params.capture_pattern}  # filter gtf file by this pattern if subset_gtf = 1
-write_final_bam_to_csv: 0               # write final merged bam file to a csv file(1: yes, 0: no)
-write_final_bam_header_to_txt: 0        # write final merged bam header to text file (1: yes, 0: no)
-nProcessors: {params.parsing_threads}   # for multiprocessing
-nthreads: {params.fc_threads}           # for featureCounts
+# subset_gtf: 1                           # subset gtf file by pattern (1: yes, 0: no)
+# subset_gtf_output_file: ontarget.gtf    # output file name of subset of gtf file
+# subset_gtf_pattern: {params.capture_pattern}  # filter gtf file by this pattern if subset_gtf = 1
+# write_final_bam_to_csv: 0               # write final merged bam file to a csv file(1: yes, 0: no)
+# write_final_bam_header_to_txt: 0        # write final merged bam header to text file (1: yes, 0: no)
+# nProcessors: {params.parsing_threads}   # for multiprocessing
+# nthreads: {params.fc_threads}           # for featureCounts
 
-# output file names and paths
-output_folder: {params.path}
-final_merged_file: {params.output_bam_fn}
-featureCounts_output_file: featurecounted
-log_file: log.txt
-error_log: error_log.txt
-EOF
-        """)
+# # output file names and paths
+# output_folder: {params.path}
+# final_merged_file: {params.output_bam_fn}
+# featureCounts_output_file: featurecounted
+# log_file: log.txt
+# error_log: error_log.txt
+# EOF
+#         """)
         
 rule count_custom_regions_tso:
     input:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
-        config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
+        # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
         #gtf = config['gtf'],
         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
     output:
-        merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
-        fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted')
-    threads: 10
+        # merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
+        merged_bam = temp(op.join(config['working_dir'], 'multimodal', '{sample}', config['final_merged_file'])),
+        csv = temp(op.join(config['working_dir'], 'multimodal', '{sample}', 'final_bam_df.csv')),
+        fc = op.join(config['working_dir'], 'multimodal', '{sample}', config['featureCounts_output_file'])
+    threads: max(config['nProcessors'], config['nthreads'])
     resources:
          mem_mb=100000
     params:
         module_path = op.join('module', 'src', 'main'),
-        run_mode = config['run_mode']
+        run_mode = config['run_mode'],
+        overallconfig = 'config.yaml'
     run:
         if params.run_mode in ['all', 'tso ontarget multi']:
             shell ("""
             # cd {params.module_path}
             ln -s -f {params.module_path} .
             ln -s -f {params.module_path}/../utilities .
-            python -m  main.combined_rock_roi --config {input.config}
+            python -m  main.combined_rock_roi --config {params.overallconfig} \
+                --sample {wildcards.sample} \
+                --wta_bam {input.wta_bam} \
+                --tso_bam {input.tso_bam}
+
+            touch {output.csv} ## in case it wasn't generated, this rather be a cleaned up by default
             """)
 
 rule create_deduped_coverage_tracks_all_filtered_in_cbs:
@@ -627,6 +671,9 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_coverage.bw')
     shell:
         """
+        ## this is unrelated to the bamgeneration; fixes starsolo's default permissions
+        chmod -R ug+rwX $(dirname {input.bam})
+
         ## first filter in 'valid' CBs
 
         ## CB are the error-corrected barcodes
@@ -640,7 +687,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         # mind the file is coordinate sorted already - so we deduplicate based on columns 27 and 28
         samtools view -H {output.cb_bam} > {output.header}
 
-        samtools view -h {output.cb_bam} -@ {threads} | uniq -f26 | cat {output.header} - | \
+        samtools view {output.cb_bam} -@ {threads} | uniq -f26 | cat {output.header} - | \
           samtools view -Sb -@ {threads} > {output.cb_ub_bam}
 
         samtools index -@ {threads} {output.cb_ub_bam}
@@ -653,49 +700,49 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         
         """
 
-rule create_deduped_coverage_tracks_single_cb:
-    input:
-        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
-                                 'filtered', 'barcodes.tsv')
-    threads:
-        config['nthreads']
-    params:
-        bamCoverage = config['bamCoverage'],
-        binSize = 10
-    output:
-        cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_{cell}_filt.bam')),
-        cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-                                 'cb_{cell}_ub_filt.bam')),
-        header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', '_{cell}_header')),
-        bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_cb_{cell}_coverage.bw')
-    shell:
-        """
-        ## first filter in the query CB
-        samtools view -h -@ {threads} {input.bam} -d CB:{wildcards.cell} \
-           -o {output.cb_bam}
+# rule create_deduped_coverage_tracks_single_cb:
+#     input:
+#         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+#         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+#                                  'filtered', 'barcodes.tsv')
+#     threads:
+#         config['nthreads']
+#     params:
+#         bamCoverage = config['bamCoverage'],
+#         binSize = 10
+#     output:
+#         cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_{cell}_filt.bam')),
+#         cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+#                                  'cb_{cell}_ub_filt.bam')),
+#         header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{cell}_header')),
+#         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_cb_{cell}_coverage.bw')
+#     shell:
+#         """
+#         ## first filter in the query CB
+#         samtools view -h -@ {threads} {input.bam} -d CB:{wildcards.cell} \
+#            -o {output.cb_bam}
 
-        ## second, deduplicate by UB (error corrected barcodes)
-        ##  so it gets only one alignment per UB:locus:CB combination
-        # 27 CB (error corrected CB; the only CB being queried)
-        # 28 UB (error corrected UMI)
-        # mind the file is coordinate sorted already - so we deduplicate based on columns 27 and 28
-        samtools view -H {output.cb_bam} > {output.header}
+#         ## second, deduplicate by UB (error corrected barcodes)
+#         ##  so it gets only one alignment per UB:locus:CB combination
+#         # 27 CB (error corrected CB; the only CB being queried)
+#         # 28 UB (error corrected UMI)
+#         # mind the file is coordinate sorted already - so we deduplicate based on columns 27 and 28
+#         samtools view -H {output.cb_bam} > {output.header}
 
-        samtools view -h {output.cb_bam} -@ {threads} | uniq -f26 | cat {output.header} - | \
-          samtools view -Sb -@ {threads} > {output.cb_ub_bam}
+#         samtools view -h {output.cb_bam} -@ {threads} | uniq -f26 | cat {output.header} - | \
+#           samtools view -Sb -@ {threads} > {output.cb_ub_bam}
 
-        samtools index -@ {threads} {output.cb_ub_bam}
+#         samtools index -@ {threads} {output.cb_ub_bam}
 
-        # deeptools coverage it, no normalization
-        {params.bamCoverage} --numberOfProcessors {threads} \
-          -b {output.cb_ub_bam} \
-          --normalizeUsing None \
-          -o {output.bw} --binSize {params.binSize}
+#         # deeptools coverage it, no normalization
+#         {params.bamCoverage} --numberOfProcessors {threads} \
+#           -b {output.cb_ub_bam} \
+#           --normalizeUsing None \
+#           -o {output.bw} --binSize {params.binSize}
         
-        """
-        
-        
+#         """
+
+
 rule generate_sce:
     input:
         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
@@ -723,3 +770,4 @@ rule generate_sce:
              --working_dir {params.working_dir} \
              --output_fn {output.sce}
         """
+
