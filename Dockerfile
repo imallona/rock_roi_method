@@ -45,5 +45,5 @@ RUN echo "export PATH=$PATH" >> ~/.bashrc
 
 ## showcase the method with simulated data and using snakemake
 
-## RUN cd /home/rock/main && \
-##      snakemake --cores 1 --configfile config.yaml 
+RUN cd /home/rock/main && \
+   snakemake --cores 1 --configfile config.yaml -p

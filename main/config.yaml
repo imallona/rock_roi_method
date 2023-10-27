@@ -15,6 +15,12 @@ nthreads: 2
 per_task_max_nthreads: 5
 per_task_max_mem:  1038822112
 
+## path to whitelists directory
+whitelist_path: '/home/imallona/src/rock_roi_method/data/'
+
+## path to the `root` of the rock_roi_method cloned repository
+rock_method_path: '..'
+
 ## fill below these line if `simulate : False` -----------------------------------------
 ## if `simulate: True` then all config below this line will be replaced by
 ##   hardcoded values (within the Snakefile)

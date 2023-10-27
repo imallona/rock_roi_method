@@ -134,7 +134,7 @@ snakemake --cores 50 --configfile config.yaml
 
 ### Writing a config file for snakemake
 
-Please check [our example config yaml](./main/config.yaml).
+Please check [our example config yaml](./main/config.yaml). **Important** This file must be named `config.yaml`.
 
 ### Simulation
 

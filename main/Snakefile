@@ -9,13 +9,20 @@
 
 # import os
 import os.path as op
+# import yaml
 # from glob import glob
 # import pandas as pd
 # import re
 
 configfile: "config.yaml"
 
-print(config)
+# args = sys.argv
+# manualconfigfile = args[args.index("--sample_config") + 1]
+
+# with open(manualconfigfile, "r") as f:
+#     config = yaml.safe_load(f)
+
+# print(manualconfigfile)
             
 if config['simulate']:
     config['gtf'] = op.join(config['working_dir'], 'data', 'genome.gtf')
@@ -637,16 +644,17 @@ rule count_custom_regions_tso:
     resources:
          mem_mb=100000
     params:
-        module_path = op.join('module', 'src', 'main'),
+        module_path = config['rock_method_path'],
         run_mode = config['run_mode'],
         overallconfig = 'config.yaml'
     run:
         if params.run_mode in ['all', 'tso ontarget multi']:
             shell ("""
             # cd {params.module_path}
-            ln -s -f {params.module_path} .
-            ln -s -f {params.module_path}/../utilities .
-            python -m  main.combined_rock_roi --config {params.overallconfig} \
+            ln -s -f {params.module_path}/main/module/src/main .
+            ln -s -f {params.module_path}/main/module/src/utilities .
+            python -m  main.combined_rock_roi \
+                --config {params.overallconfig} \
                 --sample {wildcards.sample} \
                 --wta_bam {input.wta_bam} \
                 --tso_bam {input.tso_bam}
@@ -749,13 +757,15 @@ rule generate_sce:
         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted'),
         # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
-        gtf = config['gtf']
+        gtf = config['gtf'],
+        script = op.join(config['rock_method_path'], 'main', 'generate_sce_object.R')
     output:
         sce = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds')
     params:
         run_mode = config['run_mode'],
         working_dir = config['working_dir'],
-        sample = "{wildcards.sample}"
+        sample = "{wildcards.sample}",
+        Rbin = config['Rbin']
     # run:
     #     if params.run_mode in ['all', 'tso ontarget multi']:
     #         shell ("""
@@ -765,7 +775,8 @@ rule generate_sce:
     #         shell(" echo 'something else' > {output.sce}")
     shell:
         """
-        Rscript generate_sce_object.R --sample {wildcards.sample} \
+        {params.Rbin} -q --no-save --no-restore --slave \
+             -f {input.script} --args --sample {wildcards.sample} \
              --run_mode {params.run_mode} \
              --working_dir {params.working_dir} \
              --output_fn {output.sce}
