@@ -118,8 +118,26 @@ Caution this will use the system's pip and current pythonpath; using a virtualen
 ```
 cd /home/rock/main/module && \
     pip install -r rock_n_roi_requirements.txt && \
-    pip install snakemake pandas deeptools
+    pip install snakemake pandas # deeptools
 
+```
+
+#### Bedtools
+
+```
+
+```
+
+### Kent utils
+
+```
+cd ~/.bin # or somewhere in your $PTH
+
+wget https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v385/faSize
+chmod +x faSize
+
+wget https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v385/bedGraphToBigWig
+chmod +x bedGraphToBigWig
 ```
 
 #### Running the method

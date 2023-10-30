@@ -76,7 +76,7 @@ rule all:
     input:
         expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
                sample = get_sample_names()),
-        expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_coverage.bw'),
+        expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
                modality = ['tso', 'wta'],
                sample = get_sample_names())
     
@@ -365,7 +365,7 @@ rule align_wta:
         # num_cells = get_expected_cells_by_name("{sample}"),
         num_cells = 2,
         tmp = op.join(config['working_dir'], 'tmp_align_wta_{sample}'),
-        maxmem = config['per_task_max_mem'],
+        maxmem = config['max_mem_mb'] * 1024,
         sjdbOverhang = config['sjdbOverhang']
     shell:
         """
@@ -436,7 +436,7 @@ rule align_tso:
         index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
         tmp = op.join(config['working_dir'], 'tmp_align_tso_{sample}'),
-        maxmem = config['per_task_max_mem'],
+        maxmem = config['max_mem_mb'] * 1024,
         sjdbOverhang = config['sjdbOverhang']
     shell:
         """
@@ -475,7 +475,7 @@ rule align_tso:
 
         
 ## this is a dirty workaround to reduce mem usage by selecting which chromosomes have 'captured' features
-## @todo dedup and use wildcard for modality
+## @todo filter the coordinates, not only the chromosomes
 rule subset_chromosomes_for_custom_counting:
     input:
         # bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam')
@@ -628,55 +628,154 @@ rule subset_gtf_for_custom_counting:
 # EOF
 #         """)
         
-rule count_custom_regions_tso:
+# rule count_custom_regions_tso:
+#     input:
+#         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
+#         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
+#         # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
+#         #gtf = config['gtf'],
+#         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
+#     output:
+#         # merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
+#         merged_bam = temp(op.join(config['working_dir'], 'multimodal', '{sample}', config['final_merged_file'])),
+#         csv = temp(op.join(config['working_dir'], 'multimodal', '{sample}', 'final_bam_df.csv')),
+#         fc = op.join(config['working_dir'], 'multimodal', '{sample}', config['featureCounts_output_file'])
+#     threads: max(config['nProcessors'], config['nthreads'])
+#     resources:
+#          mem_mb=200000
+#     params:
+#         module_path = config['rock_method_path'],
+#         run_mode = config['run_mode'],
+#         overallconfig = 'config.yaml',
+#         max_mem=lambda wildcards, resources: resources.mem_mb * 1024
+#     run:
+#         if params.run_mode in ['all', 'tso ontarget multi']:
+#             shell ("""
+#             # cd {params.module_path}
+#             ulimit -v {params.max_mem}
+#             ln -s -f {params.module_path}/main/module/src/main .
+#             ln -s -f {params.module_path}/main/module/src/utilities .
+#             python -m  main.combined_rock_roi \
+#                 --config {params.overallconfig} \
+#                 --sample {wildcards.sample} \
+#                 --wta_bam {input.wta_bam} \
+#                 --tso_bam {input.tso_bam}
+
+#             touch {output.csv} ## in case it wasn't generated, this rather be a cleaned up by default
+#             """)
+
+rule add_readgroups_to_bam:
     input:
-        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
-        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
+        without_rgs = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam'),
+        filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+                                    'filtered', 'barcodes.tsv')
+    output:
+        # header_barcodes = temp(op.join(config['working_dir'], 'align_{modality}',
+        #                                '{sample}', 'header_rgs')),
+        with_rgs_no_header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                          'subset_{modality}_rg_no_header.bam')),
+        with_rgs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                'subset_{modality}_rg.bam'))
+    threads: config['nthreads']
+    shell:
+        """
+        ## replace the CBs by RGs
+        samtools view -h {input.without_rgs} -@ {threads} | \
+             sed 's/CB:Z:/RG:Z:/g' | samtools view -h -Sb >  {output.with_rgs_no_header}
+
+        ## graft the new RG within the SAM header
+        ##  todo make this faster, one at a time is lame...
+        TAB="$(printf '\t')"
+        
+        while read -r barcode
+        do
+           # echo "@RG${{TAB}}ID:tso_${{barcode}}"
+           # echo "ID:tso_${{barcode}}"
+
+           samtools addreplacerg \
+             --no-PG \
+             -m orphan_only \
+             -o {output.with_rgs} \
+             --output-fmt bam \
+             -r "ID:tso_${{barcode}}" \
+             {output.with_rgs_no_header} 
+           cp {output.with_rgs} {output.with_rgs_no_header}
+        
+        done < {input.filtered_barcodes}
+
+        """
+
+rule count_custom_regions_tso_no_module:
+    input:
+        bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso_rg.bam'),
         # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
         #gtf = config['gtf'],
         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
     output:
         # merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
-        merged_bam = temp(op.join(config['working_dir'], 'multimodal', '{sample}', config['final_merged_file'])),
-        csv = temp(op.join(config['working_dir'], 'multimodal', '{sample}', 'final_bam_df.csv')),
-        fc = op.join(config['working_dir'], 'multimodal', '{sample}', config['featureCounts_output_file'])
-    threads: max(config['nProcessors'], config['nthreads'])
+        # merged_bam = temp(op.join(config['working_dir'], 'multimodal', '{sample}', config['final_merged_file'])),
+        # csv = temp(op.join(config['working_dir'], 'multimodal', '{sample}', 'final_bam_df.csv')),
+        fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted')
+    threads: config['nthreads']
     resources:
-         mem_mb=100000
+         mem_mb=config['max_mem_mb']
     params:
-        module_path = config['rock_method_path'],
+        featureCounts = config['featureCounts'],
         run_mode = config['run_mode'],
-        overallconfig = 'config.yaml'
+        overallconfig = 'config.yaml',
+        max_mem = lambda wildcards, resources: resources.mem_mb * 1024
     run:
         if params.run_mode in ['all', 'tso ontarget multi']:
             shell ("""
-            # cd {params.module_path}
-            ln -s -f {params.module_path}/main/module/src/main .
-            ln -s -f {params.module_path}/main/module/src/utilities .
-            python -m  main.combined_rock_roi \
-                --config {params.overallconfig} \
-                --sample {wildcards.sample} \
-                --wta_bam {input.wta_bam} \
-                --tso_bam {input.tso_bam}
-
-            touch {output.csv} ## in case it wasn't generated, this rather be a cleaned up by default
+            ulimit -v {params.max_mem}
+            
+            ## featurecounts
+            {params.featureCounts} \
+                 -a {input.gtf} \
+                 -o {output.fc} \
+                 {input.bam} \
+                 -F GTF \
+                 -t exon \
+                 -g gene_id \
+                 -f \
+                 -O \
+                 -M  \
+                 -T {threads} \
+                 --fraction \
+                 --byReadGroup
             """)
 
+rule retrieve_genome_sizes:
+    input:
+        fa = config['genome']
+    params:
+        faSize = config['faSize']
+    output:
+        op.join(config['working_dir'], 'data', 'chrom.sizes')
+    shell:
+        """
+        {params.faSize} -detailed -tab {input.fa} > {output}
+        """
+        
 rule create_deduped_coverage_tracks_all_filtered_in_cbs:
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
-                                 'filtered', 'barcodes.tsv')
+                                 'filtered', 'barcodes.tsv'),
+        chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
     threads:
         config['nthreads']
     params:
-        bamCoverage = config['bamCoverage'],
-        binSize = 10
+        # bamCoverage = config['bamCoverage'],
+        binSize = 10,
+        bedtools = config['bedtools'],
+        bedGraphToBigWig = config['bedGraphToBigWig']        
     output:
         cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_filt.bam')),
         cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')),
         header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'header')),
-        bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_coverage.bw')
+        cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bw')),
+        bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw')
     shell:
         """
         ## this is unrelated to the bamgeneration; fixes starsolo's default permissions
@@ -700,11 +799,13 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
 
         samtools index -@ {threads} {output.cb_ub_bam}
 
-        # deeptools coverage it, no normalization
-        {params.bamCoverage} --numberOfProcessors {threads} \
-          -b {output.cb_ub_bam} \
-          --normalizeUsing None \
-          -o {output.bw} --binSize {params.binSize}
+        {params.bedtools} genomecov -ibam {output.cb_ub_bam} \
+            -bg -split > {output.cb_ub_bg}
+
+        ## retrieve chrom sizes
+
+        ## bedgraph to bigwig
+        {params.bedGraphToBigWig} {output.cb_ub_bg} {input.chromsizes} {output.bw}
         
         """
 

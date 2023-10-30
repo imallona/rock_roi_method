@@ -7,7 +7,7 @@ LABEL version="v0.1"
 RUN useradd -m rock
 
 RUN apt-get update && \
-    apt install -y python3-pip python-is-python3 samtools wget less git nano
+    apt install -y python3-pip python-is-python3 samtools wget less git nano bedtools
 
 WORKDIR /home/rock
 COPY ./data data/
@@ -18,7 +18,7 @@ COPY ./main main/
 RUN cd /home/rock/main/module && \
     pip install -r rock_n_roi_requirements.txt && \
     mkdir -p data && \
-    pip install snakemake pandas deeptools
+    pip install snakemake pandas # deeptools
 
 # STAR, subread and SingleCellExperiment installs
 
@@ -36,8 +36,13 @@ RUN mkdir -p /home/rock/soft/star && \
     make -f Makefile.Linux && \
     ln -s  /home/rock/soft/subread/subread-2.0.6-source/bin/featureCounts /usr/local/bin/featureCounts && \
     R -e 'BiocManager::install(c("argparse", "SingleCellExperiment", "Matrix"), update = FALSE)' && \
-    chown -R rock:rock /home/rock
-
+    chown -R rock:rock /home/rock && \
+    cd /usr/local/bin && \
+    wget https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v385/faSize && \
+    chmod +x faSize && \
+    wget https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v385/bedGraphToBigWig && \
+    chmod +x bedGraphToBigWig
+    
 USER rock
 
 ENV PATH=/home/rock/soft/star/STAR-2.7.10b/source:$PATH
