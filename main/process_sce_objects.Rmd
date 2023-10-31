@@ -1,0 +1,419 @@
+---
+title: "aggregate SCE report"
+author: "Izaskun Mallona"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+params:
+    multimodal_path: ""
+    run_mode: ""
+---
+
+
+
+```{r}
+suppressPackageStartupMessages({
+    library(SingleCellExperiment)
+    library(Seurat)
+    library(scuttle)
+    ## library(scater)
+    library(ggplot2)
+    library(rmarkdown)
+})
+```
+
+
+```{r}
+opts_chunk$set(fig.width = 5,
+               fig.height = 5,
+               cache = TRUE,
+               include = TRUE,
+               dev = "png",
+               cache.lazy = FALSE,
+               warning = TRUE,
+               message = TRUE)
+```
+
+```{r}
+
+dp <- "/home/imallona/ebrunner_spectral/mixing_mouse_genome_only/multimodal_nidhi/"
+sces <- lapply(list.files(dp,
+                          ".*sce.rds", recursive = TRUE),
+               function(x) readRDS(file.path(dp, x)))
+
+## combine sces
+## sce <-  Reduce(cbind, sces)
+for (i in 1:length(sces)) {
+    colData(sces[[i]])$experiment <- mainExpName(sces[[i]])
+    colnames(rowData(sces[[i]])) <- c("name", "type", "value")
+    rownames(sces[[i]]) <- paste0(rowData(sces[[i]])$name, "__", rownames(sces[[i]]))
+}
+
+sce <-  Reduce(cbind, sces)
+rm(sces)
+
+```
+
+# WTA
+
+
+
+## Per cell and per feature QC {.tabset .tabset-fade .tabset-pills}
+
+```{r, cache = FALSE}
+sce <- addPerCellQC(sce,
+                    assay.type = 'wta',
+                    subsets = list(mito = grep('^mt-', rownames(rowData(sce)),
+                                               value = TRUE, ignore.case = TRUE),
+                                   capture = grep('ENSG|ENSMUSG', rownames(rowData(sce)), invert = TRUE)))
+
+libsize.drop <- isOutlier(sce$total, nmads = 2, type = "both", log = TRUE, batch = sce$experiment)
+feature.drop <- isOutlier(sce$detected, nmads = 2, type = "both", log = TRUE, batch = sce$experiment)
+mito.drop <- isOutlier(sce$subsets_mito_percent, nmads = 2, type = "higher", log = FALSE,
+                       batch = sce$experiment)
+```
+
+```{r, fig.width = 5, fig.height = 4, results = 'asis'}
+
+cat('### ', 'Sum vs detected (by name)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
+cat('\n\n')
+
+cat('### ', 'Sum vs detected (by species)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
+cat('\n\n')
+
+cat('### ', 'Sum vs detected (by modality)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
+cat('\n\n')
+
+cat('### ', 'Highest expressed', ' \n\n')
+plotHighestExprs(sce, exprs_values = "counts")
+cat('\n\n')
+```
+
+## QC filtering
+
+```{r}
+sce <- sce[,!(libsize.drop | feature.drop | mito.drop )]
+data.frame(ByLibSize = sum(libsize.drop),
+           ByFeature = sum(feature.drop), 
+           ByMito = sum(mito.drop),
+           Remaining = ncol(sce))
+```
+
+
+## QC after filtering {.tabset .tabset-fade .tabset-pills}
+
+### Per cell and per feature QC {.tabset .tabset-fade .tabset-pills}
+
+```{r qualmetricsafter, fig.width = 5, fig.height = 4, results = 'asis'}
+
+cat('#### ', 'Sum vs detected (by name)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = c("experiment"))
+cat('\n\n')
+
+
+cat('#### ', 'Sum vs detected (by name)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
+cat('\n\n')
+
+cat('#### ', 'Sum vs detected (by species)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
+cat('\n\n')
+
+cat('#### ', 'Sum vs detected (by modality)', ' \n\n')
+
+plotColData(sce, x = "sum", y="detected", colour_by = c("experiment"))
+cat('\n\n')
+
+## cat('### ', 'Sum vs detected (by batch)', ' \n\n')
+## plotColData(sce, x = "sum", y="detected", colour_by = c("batch"))
+## cat('\n\n')
+
+## cat('### ', 'Sum vs detected (by color)', ' \n\n')
+## plotColData(sce, x = "sum", y="detected", colour_by = c("color"))
+## cat('\n\n')
+
+
+cat('### ', 'Highest expressed', ' \n\n')
+plotHighestExprs(sce, exprs_values = "counts")
+cat('\n\n')
+```
+
+
+### Overall quality metrics after QC (hists) {.tabset .tabset-fade .tabset-pills}
+
+```{r}
+ac <- function(col, alpha=1){
+  apply(sapply(col, col2rgb)/255, 2, 
+                     function(x) 
+                         rgb(x[1], x[2], x[3], alpha=alpha))
+}
+```
+
+```{r hists_plots_after, results = 'asis'}
+
+for (id in unique(colData(sce)$experiment)) {
+    par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
+
+    curr <- subset(sce, , compound_id == id)
+    
+    cat('#### ', id, ' \n\n') 
+    hist(curr$total/1e3, xlab="Library sizes (thousands)", main="", 
+         breaks=20, col="grey80", ylab="Number of cells")
+    abline(v = attr(libsize.drop, 'thresholds')['lower', id]/1e3, col = 'blue')
+    abline(v = attr(libsize.drop, 'thresholds')['higher', id]/1e3, col = 'blue')
+
+    hist(curr$detected, xlab="Number of expressed genes", main="", 
+         breaks=20, col="grey80", ylab="Number of cells")
+    abline(v = attr(feature.drop, 'thresholds')['lower', id], col = 'blue')
+    abline(v = attr(feature.drop, 'thresholds')['higher', id], col = 'blue')
+
+    ## hist(curr$altexps_spikes_percent, xlab="ERCC proportion (%)",
+    ##      ylab="Number of cells", breaks=20, main="", col="grey80")
+    ## abline(v = attr(spike.drop, 'thresholds')['higher', id], col = 'blue')
+
+    hist(curr$subsets_mito_percent, xlab="Mitochondrial proportion (%)", 
+         ylab="Number of cells", breaks=20, main="", col="grey80")
+    abline(v = attr(mito.drop, 'thresholds')['higher', id], col = 'blue')
+    cat('\n\n')
+}
+
+```
+
+### Overall quality metrics after QC (scatter) {.tabset .tabset-fade .tabset-pills}
+
+```{r library_sizes_after, , results = 'asis'}
+for (id in unique(colData(sce)$experiment)) {
+    cat('#### ', id, ' \n\n') 
+    par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
+
+    curr <- subset(sce, , compound_id == id)
+    
+    plot(density(curr$total/1e3),
+         xlab = "library sizes (thousands)",
+         main = '')
+
+    rug(curr$total/1e3)
+
+    plot(y = curr$total/1e3,
+         x = curr$subsets_mito_percent,
+         ## col = ac(curr$color, 0.5),
+         pch = 20,
+         ylab = 'library size (thousands)',
+         xlab = 'mitochondrial proportion (%)',
+         ## col = ac('black', 0.5)
+         )
+
+    plot(y = curr$total/1e3,
+         x = curr$detected,
+         ## col = ac(curr$color, 0.5),
+         pch = 20,
+         ylab = 'library size (thousands)',
+         xlab = 'number of genes')
+    ## col = ac('black', 0.5)
+    ## )
+
+    ## plot(y = curr$total/1e3,
+    ##      x = curr$altexps_spikes_percent,
+    ##      col = ac(as.numeric(as.factor(curr$name)), 0.5),
+    ##      pch = 20,
+    ##      ylab = 'library size (thousands)',
+    ##      xlab = "ERCC proportion (%)",
+    ##      ## col = ac('black', 0.5)
+    ##      )
+
+    plot(y = curr$subsets_mito_percent,
+         x = curr$detected,
+         pch = 20,
+         xlab = 'number of genes',
+         ylab = 'mitochondrial proportion (%)',
+         col = ac('black', 0.5))
+
+    cat('\n\n')
+} 
+```
+
+
+
+# TSO 
+
+```{r}
+sce <- addPerCellQC(sce,
+                    assay.type = 'tso',
+                    subsets = list(mito = grep('^mt-', rownames(rowData(sce)),
+                                               value = TRUE, ignore.case = TRUE),
+                                   capture = grep('ENSG|ENSMUSG', rownames(rowData(sce)), invert = TRUE)))
+
+```
+
+
+```{r, fig.width = 5, fig.height = 4, results = 'asis'}
+
+cat('### ', 'Sum vs detected (by name)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
+cat('\n\n')
+
+cat('### ', 'Sum vs detected (by species)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
+cat('\n\n')
+
+cat('### ', 'Sum vs detected (by modality)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
+cat('\n\n')
+
+cat('### ', 'Highest expressed', ' \n\n')
+plotHighestExprs(sce, exprs_values = "counts")
+cat('\n\n')
+```
+
+
+## QC after WTA filtering {.tabset .tabset-fade .tabset-pills}
+
+### Per cell and per feature QC {.tabset .tabset-fade .tabset-pills}
+
+```{r, fig.width = 5, fig.height = 4, results = 'asis'}
+
+cat('#### ', 'Sum vs detected (by name)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = c("experiment"))
+cat('\n\n')
+
+
+cat('#### ', 'Sum vs detected (by name)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
+cat('\n\n')
+
+cat('#### ', 'Sum vs detected (by species)', ' \n\n')
+plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
+cat('\n\n')
+
+cat('#### ', 'Sum vs detected (by modality)', ' \n\n')
+
+plotColData(sce, x = "sum", y="detected", colour_by = c("experiment"))
+cat('\n\n')
+
+## cat('### ', 'Sum vs detected (by batch)', ' \n\n')
+## plotColData(sce, x = "sum", y="detected", colour_by = c("batch"))
+## cat('\n\n')
+
+## cat('### ', 'Sum vs detected (by color)', ' \n\n')
+## plotColData(sce, x = "sum", y="detected", colour_by = c("color"))
+## cat('\n\n')
+
+
+cat('### ', 'Highest expressed', ' \n\n')
+plotHighestExprs(sce, exprs_values = "tso")
+cat('\n\n')
+```
+
+
+### Overall quality metrics after QC (hists) {.tabset .tabset-fade .tabset-pills}
+
+```{r}
+ac <- function(col, alpha=1){
+  apply(sapply(col, col2rgb)/255, 2, 
+                     function(x) 
+                         rgb(x[1], x[2], x[3], alpha=alpha))
+}
+```
+
+```{r, results = 'asis'}
+
+for (id in unique(colData(sce)$experiment)) {
+    par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
+
+    curr <- subset(sce, , compound_id == id)
+    
+    cat('#### ', id, ' \n\n') 
+    hist(curr$total/1e3, xlab="Library sizes (thousands)", main="", 
+         breaks=20, col="grey80", ylab="Number of cells")
+
+    hist(curr$detected, xlab="Number of expressed genes", main="", 
+         breaks=20, col="grey80", ylab="Number of cells")
+
+    ## hist(curr$altexps_spikes_percent, xlab="ERCC proportion (%)",
+    ##      ylab="Number of cells", breaks=20, main="", col="grey80")
+    ## abline(v = attr(spike.drop, 'thresholds')['higher', id], col = 'blue')
+
+    hist(curr$subsets_mito_percent, xlab="Mitochondrial proportion (%)", 
+         ylab="Number of cells", breaks=20, main="", col="grey80")
+
+    cat('\n\n')
+}
+
+```
+
+### Overall quality metrics after WTA QC (scatter) {.tabset .tabset-fade .tabset-pills}
+
+```{r, results = 'asis'}
+for (id in unique(colData(sce)$experiment)) {
+    cat('#### ', id, ' \n\n') 
+    par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
+
+    curr <- subset(sce, , compound_id == id)
+    
+    plot(density(curr$total/1e3),
+         xlab = "library sizes (thousands)",
+         main = '')
+
+    rug(curr$total/1e3)
+
+    plot(y = curr$total/1e3,
+         x = curr$subsets_mito_percent,
+         ## col = ac(curr$color, 0.5),
+         pch = 20,
+         ylab = 'library size (thousands)',
+         xlab = 'mitochondrial proportion (%)',
+         ## col = ac('black', 0.5)
+         )
+
+    plot(y = curr$total/1e3,
+         x = curr$detected,
+         ## col = ac(curr$color, 0.5),
+         pch = 20,
+         ylab = 'library size (thousands)',
+         xlab = 'number of genes')
+    ## col = ac('black', 0.5)
+    ## )
+
+    ## plot(y = curr$total/1e3,
+    ##      x = curr$altexps_spikes_percent,
+    ##      col = ac(as.numeric(as.factor(curr$name)), 0.5),
+    ##      pch = 20,
+    ##      ylab = 'library size (thousands)',
+    ##      xlab = "ERCC proportion (%)",
+    ##      ## col = ac('black', 0.5)
+    ##      )
+
+    plot(y = curr$subsets_mito_percent,
+         x = curr$detected,
+         pch = 20,
+         xlab = 'number of genes',
+         ylab = 'mitochondrial proportion (%)',
+         col = ac('black', 0.5))
+
+    cat('\n\n')
+} 
+```
+
+
+
+# TSO ontarget
+
+```{r}
+
+```
+
+# Session info
+
+```{r}
+sessionInfo()
+```

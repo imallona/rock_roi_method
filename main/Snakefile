@@ -341,7 +341,6 @@ rule prepare_whitelists:
 #     run:
 #         create_run_mode_flag_files()
 
-## caution we're hardcoding threads so one job is run at a time
 rule align_wta:
     input:
         # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
@@ -354,25 +353,26 @@ rule align_wta:
         cb2 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS2.txt'),
         cb3 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS3.txt')
     output:
-        bam = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam')),
+        bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                     'filtered', 'barcodes.tsv')
-    threads: config['nthreads']
+    threads: workflow.cores
     params:
+        threads = 5,
         path = op.join(config['working_dir'], 'align_wta', "{sample}/"),
         index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
         # num_cells = get_expected_cells_by_name("{sample}"),
         num_cells = 2,
         tmp = op.join(config['working_dir'], 'tmp_align_wta_{sample}'),
-        maxmem = config['max_mem_mb'] * 1024,
+        maxmem = config['max_mem_mb'] * 1024 * 1024,
         sjdbOverhang = config['sjdbOverhang']
     shell:
         """
    rm -rf {params.tmp}
    mkdir -p {params.path} 
 
-   {params.STAR} --runThreadN 5 \
+   {params.STAR} --runThreadN {params.threads} \
      --genomeDir {params.index_path} \
      --readFilesCommand zcat \
      --outFileNamePrefix {params.path} \
@@ -412,7 +412,6 @@ rule align_wta:
 #         awk -F "_" '{{print $1"AATG"$2"CCAC"$3}}' {input.filtered_barcodes} > {output.tso_whitelist}
 #         """
         
-## caution we're hardcoding threads so one job is run at a time
 rule align_tso:
     input:
         # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
@@ -430,13 +429,14 @@ rule align_tso:
     output:
         #bam = temp(op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'))
         bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam')
-    threads: config['nthreads']
+    threads:  workflow.cores
     params:
+        threads = 5,
         path = op.join(config['working_dir'], 'align_tso', "{sample}/"),
         index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
         tmp = op.join(config['working_dir'], 'tmp_align_tso_{sample}'),
-        maxmem = config['max_mem_mb'] * 1024,
+        maxmem = config['max_mem_mb'] * 1024 * 1024, 
         sjdbOverhang = config['sjdbOverhang']
     shell:
         """
@@ -448,7 +448,7 @@ rule align_tso:
         # #--soloCBwhitelist input.tso_whitelist
         #      # --soloCBmatchWLtype Exact 
 
-        {params.STAR} --runThreadN 5 \
+        {params.STAR} --runThreadN {params.threads} \
         --genomeDir {params.index_path} \
         --readFilesCommand zcat \
         --outFileNamePrefix {params.path} \
@@ -800,9 +800,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         samtools index -@ {threads} {output.cb_ub_bam}
 
         {params.bedtools} genomecov -ibam {output.cb_ub_bam} \
-            -bg -split > {output.cb_ub_bg}
-
-        ## retrieve chrom sizes
+            -bg -split | LC_COLLATE=C sort -k1,1 -k2,2n > {output.cb_ub_bg}
 
         ## bedgraph to bigwig
         {params.bedGraphToBigWig} {output.cb_ub_bg} {input.chromsizes} {output.bw}

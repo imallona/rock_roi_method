@@ -100,6 +100,7 @@ wta <- read_matrix(mtx = file.path(wd, 'align_wta', id,  'Solo.out', 'Gene', 'fi
 wta_feat <- read.table(file.path(wd, 'align_wta', id,  'Solo.out', 'Gene', 'filtered', 'features.tsv'),
                        row.names = 1,
                        header = FALSE)
+colnames(wta_feat) <- c("name", "type", "value")
 
 ## wta end
 
