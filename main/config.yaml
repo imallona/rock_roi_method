@@ -42,6 +42,8 @@ run_mode: 'all'
 
 ## GTF `source` field identifying on-target rock- or roi- features
 capture_gtf_column_2_pattern : 'captured'
+featurecounts_t: 'exon' ## feature counting unit for featurecounts
+featurecounts_g: 'gene_id' ## feature grouping unit for featurecounts
 
 samples:
   - name: simulated

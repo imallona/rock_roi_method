@@ -516,7 +516,9 @@ rule count_custom_regions_tso_no_module:
         featureCounts = config['featureCounts'],
         run_mode = config['run_mode'],
         overallconfig = 'config.yaml',
-        max_mem = lambda wildcards, resources: resources.mem_mb * 1024
+        max_mem = lambda wildcards, resources: resources.mem_mb * 1024,
+        t = config['featurecounts_t'],
+        g = config['featurecounts_g']
     run:
         if params.run_mode in ['all', 'tso ontarget multi']:
             shell ("""
@@ -528,8 +530,8 @@ rule count_custom_regions_tso_no_module:
                  -o {output.fc} \
                  {input.bam} \
                  -F GTF \
-                 -t exon \
-                 -g gene_id \
+                 -t {params.t} \
+                 -g {params.g} \
                  -f \
                  -O \
                  -M  \

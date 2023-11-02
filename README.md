@@ -117,7 +117,7 @@ Caution this will use the system's pip and current pythonpath; using a virtualen
 
 ```
 cd /home/rock/main/module && \
-    pip install -r rock_n_roi_requirements.txt && \
+    # pip install -r rock_n_roi_requirements.txt && \
     pip install snakemake pandas # deeptools
 
 ```
@@ -189,7 +189,7 @@ GPLv3
 ## Contributors
 
 - Izaskun Mallona 
-- Nidhi Agrawal
+- Nidhi Agrawal (python counting module)
 - We reuse and adapt tools from STAR, subread (featurecounts), samtools and others; we are extremely grateful to their contributors for their unvaluable resources free and openly provided to the community
 
 ## Contact
