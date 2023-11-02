@@ -66,7 +66,7 @@ read_matrix <- function(mtx, cells, features, cell.column = 1, feature.column = 
 }
 
 read_featurecounts <- function(fn, wta_whitelist) {
-    mtso <- read.table(fn, header = TRUE)
+    mtso <- read.table(fn, header = TRUE, sep = '\t')
     if (all(!duplicated(mtso$Geneid))) {
         rownames(mtso) <- mtso$Geneid
     } else {

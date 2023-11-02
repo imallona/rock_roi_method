@@ -308,7 +308,7 @@ rule align_wta:
                                     'filtered', 'barcodes.tsv')
     threads: workflow.cores
     params:
-        threads = min(5, workflow.cores),
+        threads = min(10, workflow.cores),
         path = op.join(config['working_dir'], 'align_wta', "{sample}/"),
         index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
@@ -378,7 +378,7 @@ rule align_tso:
         bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam')
     threads:  workflow.cores
     params:
-        threads = min(5, workflow.cores),
+        threads = min(10, workflow.cores),
         path = op.join(config['working_dir'], 'align_tso', "{sample}/"),
         index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
@@ -480,7 +480,7 @@ rule add_readgroups_to_bam:
         """
         ## replace the CBs by RGs
         samtools view -h {input.without_rgs} -@ {threads} | \
-             sed 's/CB:Z:/RG:Z:/g' | samtools view -h -Sb >  {output.with_rgs_no_header}
+             sed 's/CB:Z:/RG:Z:tso_/g' | samtools view -h -Sb >  {output.with_rgs_no_header}
 
         ## get the old bam header
         samtools view -H {input.without_rgs} > {output.header}
@@ -491,7 +491,7 @@ rule add_readgroups_to_bam:
         while read -r barcode
         do
            # echo "@RG${{TAB}}ID:wta_${{barcode}}"
-           echo "@RG${{TAB}}ID:ts_${{barcode}}"
+           echo "@RG${{TAB}}ID:tso_${{barcode}}"
 
         done < {input.filtered_barcodes} > {output.header_barcodes}
 
