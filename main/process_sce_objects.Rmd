@@ -1,6 +1,6 @@
 ---
-title: "aggregate SCE report"
-author: "Izaskun Mallona"
+title: "QC"
+author: "Izaskun Mallona, Mark D. Robinson lab, UZH"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -23,27 +23,44 @@ suppressPackageStartupMessages({
     library(SingleCellExperiment)
     library(Seurat)
     library(scuttle)
-    ## library(scater)
+    library(scater)
     library(ggplot2)
     library(rmarkdown)
 })
 ```
 
+This report processes:
 
 ```{r}
-opts_chunk$set(fig.width = 5,
-               fig.height = 5,
-               cache = TRUE,
-               include = TRUE,
-               dev = "png",
-               cache.lazy = FALSE,
-               warning = TRUE,
-               message = TRUE)
+print(params$multimodal_path)
+print(params$run_mode)
+```
+
+```{r}
+ac <- function(col, alpha=1){
+  apply(sapply(col, col2rgb)/255, 2, 
+                     function(x) 
+                         rgb(x[1], x[2], x[3], alpha=alpha))
+}
+```
+
+
+```{r}
+knitr::opts_chunk$set(fig.width = 5,
+                      fig.height = 5,
+                      cache = TRUE,
+                      include = TRUE,
+                      dev = "png",
+                      dev.args = list(type = "cairo-png"),
+                      cache.lazy = FALSE,
+                      warning = TRUE,
+                      message = TRUE)
 ```
 
 ```{r}
 
-dp <- "/home/imallona/ebrunner_spectral/mixing_mouse_genome_only/multimodal_nidhi/"
+## dp <- "/home/imallona/ebrunner_spectral/mixing_mouse_genome_only/multimodal_nidhi/"
+dp <- params$multimodal_path
 sces <- lapply(list.files(dp,
                           ".*sce.rds", recursive = TRUE),
                function(x) readRDS(file.path(dp, x)))
@@ -62,8 +79,6 @@ rm(sces)
 ```
 
 # WTA
-
-
 
 ## Per cell and per feature QC {.tabset .tabset-fade .tabset-pills}
 
@@ -86,16 +101,8 @@ cat('### ', 'Sum vs detected (by name)', ' \n\n')
 plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
 cat('\n\n')
 
-cat('### ', 'Sum vs detected (by species)', ' \n\n')
-plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
-cat('\n\n')
-
-cat('### ', 'Sum vs detected (by modality)', ' \n\n')
-plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
-cat('\n\n')
-
 cat('### ', 'Highest expressed', ' \n\n')
-plotHighestExprs(sce, exprs_values = "counts")
+plotHighestExprs(sce, exprs_values = "wta")
 cat('\n\n')
 ```
 
@@ -120,20 +127,6 @@ cat('#### ', 'Sum vs detected (by name)', ' \n\n')
 plotColData(sce, x = "sum", y="detected", colour_by = c("experiment"))
 cat('\n\n')
 
-
-cat('#### ', 'Sum vs detected (by name)', ' \n\n')
-plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
-cat('\n\n')
-
-cat('#### ', 'Sum vs detected (by species)', ' \n\n')
-plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
-cat('\n\n')
-
-cat('#### ', 'Sum vs detected (by modality)', ' \n\n')
-
-plotColData(sce, x = "sum", y="detected", colour_by = c("experiment"))
-cat('\n\n')
-
 ## cat('### ', 'Sum vs detected (by batch)', ' \n\n')
 ## plotColData(sce, x = "sum", y="detected", colour_by = c("batch"))
 ## cat('\n\n')
@@ -144,27 +137,20 @@ cat('\n\n')
 
 
 cat('### ', 'Highest expressed', ' \n\n')
-plotHighestExprs(sce, exprs_values = "counts")
+plotHighestExprs(sce, exprs_values = "tso_off_and_ontarget_unique")
 cat('\n\n')
 ```
 
 
 ### Overall quality metrics after QC (hists) {.tabset .tabset-fade .tabset-pills}
 
-```{r}
-ac <- function(col, alpha=1){
-  apply(sapply(col, col2rgb)/255, 2, 
-                     function(x) 
-                         rgb(x[1], x[2], x[3], alpha=alpha))
-}
-```
 
 ```{r hists_plots_after, results = 'asis'}
 
 for (id in unique(colData(sce)$experiment)) {
     par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
 
-    curr <- subset(sce, , compound_id == id)
+    curr <- subset(sce, , experiment == id)
     
     cat('#### ', id, ' \n\n') 
     hist(curr$total/1e3, xlab="Library sizes (thousands)", main="", 
@@ -196,7 +182,7 @@ for (id in unique(colData(sce)$experiment)) {
     cat('#### ', id, ' \n\n') 
     par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
 
-    curr <- subset(sce, , compound_id == id)
+    curr <- subset(sce, , experiment == id)
     
     plot(density(curr$total/1e3),
          xlab = "library sizes (thousands)",
@@ -244,11 +230,13 @@ for (id in unique(colData(sce)$experiment)) {
 
 
 
-# TSO 
+# TSO (on- and offtarget, unique) {.tabset .tabset-pills}
+
+## Per cell and per feature QC {.tabset .tabset-pills}
 
 ```{r}
 sce <- addPerCellQC(sce,
-                    assay.type = 'tso',
+                    assay.type = 'tso_off_and_ontarget_unique',
                     subsets = list(mito = grep('^mt-', rownames(rowData(sce)),
                                                value = TRUE, ignore.case = TRUE),
                                    capture = grep('ENSG|ENSMUSG', rownames(rowData(sce)), invert = TRUE)))
@@ -262,16 +250,8 @@ cat('### ', 'Sum vs detected (by name)', ' \n\n')
 plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
 cat('\n\n')
 
-cat('### ', 'Sum vs detected (by species)', ' \n\n')
-plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
-cat('\n\n')
-
-cat('### ', 'Sum vs detected (by modality)', ' \n\n')
-plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
-cat('\n\n')
-
 cat('### ', 'Highest expressed', ' \n\n')
-plotHighestExprs(sce, exprs_values = "counts")
+plotHighestExprs(sce, exprs_values = "tso_off_and_ontarget_unique")
 cat('\n\n')
 ```
 
@@ -281,36 +261,12 @@ cat('\n\n')
 ### Per cell and per feature QC {.tabset .tabset-fade .tabset-pills}
 
 ```{r, fig.width = 5, fig.height = 4, results = 'asis'}
-
 cat('#### ', 'Sum vs detected (by name)', ' \n\n')
 plotColData(sce, x = "sum", y="detected", colour_by = c("experiment"))
 cat('\n\n')
-
-
-cat('#### ', 'Sum vs detected (by name)', ' \n\n')
-plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
-cat('\n\n')
-
-cat('#### ', 'Sum vs detected (by species)', ' \n\n')
-plotColData(sce, x = "sum", y="detected", colour_by = "experiment")
-cat('\n\n')
-
-cat('#### ', 'Sum vs detected (by modality)', ' \n\n')
-
-plotColData(sce, x = "sum", y="detected", colour_by = c("experiment"))
-cat('\n\n')
-
-## cat('### ', 'Sum vs detected (by batch)', ' \n\n')
-## plotColData(sce, x = "sum", y="detected", colour_by = c("batch"))
-## cat('\n\n')
-
-## cat('### ', 'Sum vs detected (by color)', ' \n\n')
-## plotColData(sce, x = "sum", y="detected", colour_by = c("color"))
-## cat('\n\n')
-
 
 cat('### ', 'Highest expressed', ' \n\n')
-plotHighestExprs(sce, exprs_values = "tso")
+plotHighestExprs(sce, exprs_values = "tso_off_and_ontarget_unique")
 cat('\n\n')
 ```
 
@@ -330,7 +286,7 @@ ac <- function(col, alpha=1){
 for (id in unique(colData(sce)$experiment)) {
     par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
 
-    curr <- subset(sce, , compound_id == id)
+    curr <- subset(sce, , experiment == id)
     
     cat('#### ', id, ' \n\n') 
     hist(curr$total/1e3, xlab="Library sizes (thousands)", main="", 
@@ -358,7 +314,7 @@ for (id in unique(colData(sce)$experiment)) {
     cat('#### ', id, ' \n\n') 
     par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
 
-    curr <- subset(sce, , compound_id == id)
+    curr <- subset(sce, , experiment == id)
     
     plot(density(curr$total/1e3),
          xlab = "library sizes (thousands)",
@@ -405,8 +361,29 @@ for (id in unique(colData(sce)$experiment)) {
 ```
 
 
-
 # TSO ontarget
+
+## Raw counts {.tabset .tabset-pills}
+
+```{r, results = 'asis'}
+
+print(rownames(altExp(sce, 'tso_ontarget_multi')))
+
+colData(altExp(sce, 'tso_ontarget_multi')) <- colData(sce)
+
+for (experiment in unique(colData(altExp(sce, 'tso_ontarget_multi'))$experiment)) {
+    cat('### ', experiment, ' \n\n')
+    
+    idx <- colData(altExp(sce, 'tso_ontarget_multi'))$experiment == experiment
+    plot(colSums(assay(altExp(sce[,idx], 'tso_ontarget_multi'))),
+         main = experiment,
+         xlab = 'Cell (index)')
+
+    cat('\n\n')
+}
+```
+
+## Detection rates {.tabset .tabset.pills}
 
 ```{r}
 

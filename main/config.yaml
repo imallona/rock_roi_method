@@ -18,11 +18,12 @@ nthreads: 2
 per_task_max_nthreads: 5
 max_mem_mb: 20000 ## these are megabytes
 
-## Path to whitelists directory
-whitelist_path: '/home/imallona/src/rock_roi_method/data/'
+## Path to whitelists directory (we assume we're currently inside folder `main`)
+##  the pre-filled paths point to Docker paths
+whitelist_path: '/home/rock/data'
 
 ## path to the `root` of the rock_roi_method cloned repository
-rock_method_path: '..'
+rock_method_path: '/home/rock'
 
 ## fill below these line if `simulate : False` -----------------------------------------
 ## if `simulate: True` then all config below this line will be replaced by

@@ -13,14 +13,14 @@ WORKDIR /home/rock
 COPY ./data data/
 COPY ./main main/
 
-## rockandroi python module install along with snakemake and deeptools
+## (_not_ rockandroi python module) python installs along with snakemake (and _not_ deeptools)
 
 RUN cd /home/rock/main/module && \
-    pip install -r rock_n_roi_requirements.txt && \
+    # pip install -r rock_n_roi_requirements.txt && \
     mkdir -p data && \
     pip install snakemake pandas # deeptools
 
-# STAR, subread and SingleCellExperiment installs
+# STAR, subread and R packages installs
 
 RUN mkdir -p /home/rock/soft/star && \
     cd /home/rock/soft/star && \
@@ -35,7 +35,8 @@ RUN mkdir -p /home/rock/soft/star && \
     cd subread-2.0.6-source/src && \
     make -f Makefile.Linux && \
     ln -s  /home/rock/soft/subread/subread-2.0.6-source/bin/featureCounts /usr/local/bin/featureCounts && \
-    R -e 'BiocManager::install(c("argparse", "SingleCellExperiment", "Matrix"), update = FALSE)' && \
+    R -e 'BiocManager::install(c("argparse", "SingleCellExperiment", "Matrix", "Seurat", \
+          "scater", "scuttle", "ggplot2"), update = FALSE)' && \
     chown -R rock:rock /home/rock && \
     cd /usr/local/bin && \
     wget https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v385/faSize && \

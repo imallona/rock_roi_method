@@ -7,22 +7,10 @@
 ## Izaskun Mallona
 ## GPLv3
 
-# import os
 import os.path as op
-# import yaml
-# from glob import glob
-# import pandas as pd
-# import re
 
 configfile: "config.yaml"
 
-# args = sys.argv
-# manualconfigfile = args[args.index("--sample_config") + 1]
-
-# with open(manualconfigfile, "r") as f:
-#     config = yaml.safe_load(f)
-
-# print(manualconfigfile)
             
 if config['simulate']:
     config['gtf'] = op.join(config['working_dir'], 'data', 'genome.gtf')
@@ -74,11 +62,12 @@ umis = ['AACCTTGG', 'CCGGTTAA', 'TTGGCCAA', 'GACATAGG']
 
 rule all:
     input:
+        op.join(config['working_dir'], 'multimodal', 'descriptive_report.html'),
         expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
-               sample = get_sample_names()),
-        expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
-               modality = ['tso', 'wta'],
-               sample = get_sample_names())
+               sample = get_sample_names())#,
+        # expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
+        #        modality = ['tso', 'wta'],
+        #        sample = get_sample_names())
     
 rule index:
     input:
@@ -266,25 +255,7 @@ seq 21 30 | awk ' {{print "@tso"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.c
 seq 31 32 | awk ' {{print "@wta"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nATTCCAAACTTAGCTTCAGTTATAAATTCCCCTCCCATGATTGGGATTTTATAAACTTTTCTTCCATATAATTCATCTTTCTTCTCATAACCGTCTCCGAAAAACTTCAACTTAAATCCAACCTTTAACTGCTCATCA\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r1}
 
 seq 31 32 | awk ' {{print "@wta"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nG{wildcards.cb1}{params.wta_fix1}{wildcards.cb2}{params.wta_fix2}{wildcards.cb3}{wildcards.umi}TTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r2}
-
-
       """
-
-# rule retrieve_whitelist:
-#     output:
-#         op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS1.txt'),
-#         op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS2.txt'),
-#         op.join(config['working_dir'], 'data', 'whitelists', 'BD_CLS3.txt')
-#     params:
-#         path = op.join(config['working_dir'], 'data', 'whitelists')
-#     shell:
-#         """
-#         mkdir -p {params.path}
-#         cd {params.path}
-#         wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS1.txt
-#         wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS2.txt
-#         wget https://teichlab.github.io/scg_lib_structs/data/BD_CLS3.txt
-#         """
 
 ## bd offers a couple of sets of whitelists, so we fetch the right one according to the config.yaml file
 def symlink_whitelist(sample):
@@ -319,27 +290,6 @@ rule prepare_whitelists:
         sample = wildcards.sample
         symlink_whitelist(sample)
 
-# def create_run_mode_flag_files():
-#     if config['run_mode'] == 'all':
-#         with open(op.join(config['working_dir'], 'report_tso.flag'), 'w') as fh:
-#             fh.write("flag")
-#         with open(op.join(config['working_dir'], 'report_nidhis.flag'), 'w') as fh:
-#             fh.write("flag") 
-#     elif config['run_mode'] == 'tso off- and ontarget unique':
-#         with open(op.join(config['working_dir'], 'report_tso.flag'), 'w') as fh:
-#             fh.write("flag")
-#     elif config['run_mode'] == 'tso ontarget multi':
-#         with open(op.join(config['working_dir'], 'report_nidhis.flag'), 'w') as fh:
-#             fh.write("flag")
-#     with open(op.join(config['working_dir'], 'run_mode_done.flag'), 'w') as fh:
-#             fh.write("flag")
-
-    
-# rule define_run_mode:
-#     output:
-#         cb1 = op.join(config['working_dir'], 'run_mode_done.flag'),
-#     run:
-#         create_run_mode_flag_files()
 
 rule align_wta:
     input:
@@ -358,7 +308,7 @@ rule align_wta:
                                     'filtered', 'barcodes.tsv')
     threads: workflow.cores
     params:
-        threads = 5,
+        threads = min(5, workflow.cores),
         path = op.join(config['working_dir'], 'align_wta', "{sample}/"),
         index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
@@ -414,13 +364,10 @@ rule align_wta:
         
 rule align_tso:
     input:
-        # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
-        # r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
         cdna = lambda wildcards: get_cdna_by_name(wildcards.sample),
         cbumi = lambda wildcards: get_cbumi_by_name(wildcards.sample),
         index_flag = op.join(config['working_dir'] , 'data', 'index', 'SAindex'),
         gtf = config['gtf'],
-        # tso_whitelist = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist.txt'),
         # filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
         #                             'filtered', 'barcodes.tsv'),
         cb1 = op.join(config['working_dir'], 'align_wta', "{sample}",  'whitelists', 'BD_CLS1.txt'),
@@ -431,7 +378,7 @@ rule align_tso:
         bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam')
     threads:  workflow.cores
     params:
-        threads = 5,
+        threads = min(5, workflow.cores),
         path = op.join(config['working_dir'], 'align_tso', "{sample}/"),
         index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
@@ -478,12 +425,9 @@ rule align_tso:
 ## @todo filter the coordinates, not only the chromosomes
 rule subset_chromosomes_for_custom_counting:
     input:
-        # bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam')
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')
     output:
         red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam'),
-        # temp_red_bam = temp(op.join(config['working_dir'], 'align_tso', '{sample}', 'temp_subset_tso.bam')),
-        # temp_red_wta_bam = temp(op.join(config['working_dir'], 'align_wta', '{sample}', 'temp_subset_wta.bam')),
         chrs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'captured_chrs.txt'))        
     threads: 10        
     params:
@@ -504,41 +448,6 @@ rule subset_chromosomes_for_custom_counting:
                 samtools view -Sb > {output.red_bam}
             """)
 
-# rule subset_cells_for_custom_counting:
-#     input:
-#         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_chr_{modality}.bam')
-#     output:
-#         cb_filt_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-#                               'subset_{modality}.bam')),
-#         chrs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'captured_chrs.txt'))        
-#     threads: 10        
-#     params:
-#         gtf = config['gtf'],
-#         run_mode = config['run_mode'],
-#         pattern = config['capture_gtf_column_2_pattern'],
-#         temp_red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}',
-#                                'tmp_subset_{modality}.bam')
-#     run:
-#         if params.run_mode in ['all', 'tso ontarget multi']:
-#             shell ("""
-#             grep {params.pattern} {params.gtf} | cut -f1 | sort | uniq  > {output.chrs}
-#             captured=$(cat {output.chrs} | tr '\\n' ' ')
-
-#             samtools index -@ {threads} {input.bam}
-
-#             samtools view -h {input.bam}  $captured -@ {threads} | \
-#                 samtools view -Sb > {output.red_bam}
-
-#             ## plus rehead; this does not work due to the chromosome ordering
-#             # samtools view -H [output.red_bam] | \
-#             #   grep  -e "HD\|PG\|CO"  -f [output.chrs] | \
-#             #   samtools reheader --no-PG - [output.red_bam] > [params.temp_red_bam]
-
-#             # mv [params.temp_red_bam]  [output.red_bam]
-
-#             # samtools index -@ [threads] [output.red_bam]
-#             """)
-    
 rule subset_gtf_for_custom_counting:
     input:
         gtf = config['gtf']
@@ -551,118 +460,6 @@ rule subset_gtf_for_custom_counting:
         """
         grep {params.pattern} {input.gtf} > {output.subset_gtf}
         """
-        
-        
-# rule create_config_file_for_custom_counting:
-#     input:
-#         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
-#         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
-#         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
-#     output:
-#         config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml')
-#     threads: 10        
-#     params:
-#         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
-#         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
-#         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf'),
-#         fc = 'featureCounts',
-#         parsing_threads = 5,
-#         fc_threads = 2,
-#         path = op.join(config['working_dir'], 'multimodal', '{sample}/'), ## mind the last slash
-#         output_bam_fn = '{sample}_tso_and_wta.bam',
-#         seqlogo = op.join(config['working_dir'], 'multimodal', '{sample}', 'seqlogo.png'),
-#         capture_pattern = config['capture_gtf_column_2_pattern'],
-#         run_mode = config['run_mode']
-#     run:
-#         if params.run_mode in ['all', 'tso ontarget multi']:
-#             shell ("""
-# mkdir -p {params.path}
-# cat <<EOF > {output.config}
-# # input file paths
-# input_bam_file_paths: 
-#   - {params.wta_bam}
-#   - {params.tso_bam}
-# unique_cb_bamfile_list:               # for valid cell bar codes extraction
-#   - {params.wta_bam}
-# gtf_file: {params.gtf}
-# featureCounts_path: {params.fc}
-
-# # input parameters
-# linker_pattern_for_seq_logo: ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC) # tso pattern to get tso tail seq logo
-# linker_pattern_list:                              # list of linkers to be matched with alignment. If no match then CB tag is recovered where possible.
-#   - ^([A-Z]{{9}})(AATG[A-Z]{{9}}CCAC)             # tso linkers
-#   - ^(A|GT|TCA)?([A-Z]{{9}})(GTGA[A-Z]{{9}}GACA)  # wta linkers
-# seq_logo_filename: {params.seqlogo}
-# cb1_len: 9                            # length of first part of CB tag
-# cb2_len: 9                            # length of second part of CB tag
-# cb3_len: 9                            # length of third part of CB tag
-# linker_left_len: 4                    # length of linker on left
-# linker_right_len: 4                   # length of linker on right
-# umi_len: 8                            # length of UMI in sS tag
-# chunk_genomic_area: 1000              # number of base pairs to be processed by each process in multiprocessing
-
-# # NOTE: number of rg tag names must be equal to the number of input bam files and in the order of input bam files
-# rg_tag_names:
-#   - wta
-#   - tso 
-
-# chromosomes:                            # chromosomes to be processed (None means all of them)
-#   - chr5
-#   - tdtomato
-#   - egfp
-
-# subset_gtf: 1                           # subset gtf file by pattern (1: yes, 0: no)
-# subset_gtf_output_file: ontarget.gtf    # output file name of subset of gtf file
-# subset_gtf_pattern: {params.capture_pattern}  # filter gtf file by this pattern if subset_gtf = 1
-# write_final_bam_to_csv: 0               # write final merged bam file to a csv file(1: yes, 0: no)
-# write_final_bam_header_to_txt: 0        # write final merged bam header to text file (1: yes, 0: no)
-# nProcessors: {params.parsing_threads}   # for multiprocessing
-# nthreads: {params.fc_threads}           # for featureCounts
-
-# # output file names and paths
-# output_folder: {params.path}
-# final_merged_file: {params.output_bam_fn}
-# featureCounts_output_file: featurecounted
-# log_file: log.txt
-# error_log: error_log.txt
-# EOF
-#         """)
-        
-# rule count_custom_regions_tso:
-#     input:
-#         tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso.bam'),
-#         wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'subset_wta.bam'),
-#         # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
-#         #gtf = config['gtf'],
-#         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
-#     output:
-#         # merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
-#         merged_bam = temp(op.join(config['working_dir'], 'multimodal', '{sample}', config['final_merged_file'])),
-#         csv = temp(op.join(config['working_dir'], 'multimodal', '{sample}', 'final_bam_df.csv')),
-#         fc = op.join(config['working_dir'], 'multimodal', '{sample}', config['featureCounts_output_file'])
-#     threads: max(config['nProcessors'], config['nthreads'])
-#     resources:
-#          mem_mb=200000
-#     params:
-#         module_path = config['rock_method_path'],
-#         run_mode = config['run_mode'],
-#         overallconfig = 'config.yaml',
-#         max_mem=lambda wildcards, resources: resources.mem_mb * 1024
-#     run:
-#         if params.run_mode in ['all', 'tso ontarget multi']:
-#             shell ("""
-#             # cd {params.module_path}
-#             ulimit -v {params.max_mem}
-#             ln -s -f {params.module_path}/main/module/src/main .
-#             ln -s -f {params.module_path}/main/module/src/utilities .
-#             python -m  main.combined_rock_roi \
-#                 --config {params.overallconfig} \
-#                 --sample {wildcards.sample} \
-#                 --wta_bam {input.wta_bam} \
-#                 --tso_bam {input.tso_bam}
-
-#             touch {output.csv} ## in case it wasn't generated, this rather be a cleaned up by default
-#             """)
 
 rule add_readgroups_to_bam:
     input:
@@ -670,8 +467,10 @@ rule add_readgroups_to_bam:
         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                     'filtered', 'barcodes.tsv')
     output:
-        # header_barcodes = temp(op.join(config['working_dir'], 'align_{modality}',
-        #                                '{sample}', 'header_rgs')),
+        header = temp(op.join(config['working_dir'], 'align_{modality}',
+                                       '{sample}', 'header')),
+        header_barcodes = temp(op.join(config['working_dir'], 'align_{modality}',
+                                       '{sample}', 'header_rgs')),
         with_rgs_no_header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
                                           'subset_{modality}_rg_no_header.bam')),
         with_rgs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
@@ -683,42 +482,36 @@ rule add_readgroups_to_bam:
         samtools view -h {input.without_rgs} -@ {threads} | \
              sed 's/CB:Z:/RG:Z:/g' | samtools view -h -Sb >  {output.with_rgs_no_header}
 
-        ## graft the new RG within the SAM header
-        ##  todo make this faster, one at a time is lame...
+        ## get the old bam header
+        samtools view -H {input.without_rgs} > {output.header}
+
+        ## generate a RG header
         TAB="$(printf '\t')"
-        
+
         while read -r barcode
         do
-           # echo "@RG${{TAB}}ID:tso_${{barcode}}"
-           # echo "ID:tso_${{barcode}}"
+           # echo "@RG${{TAB}}ID:wta_${{barcode}}"
+           echo "@RG${{TAB}}ID:ts_${{barcode}}"
 
-           samtools addreplacerg \
-             --no-PG \
-             -m orphan_only \
-             -o {output.with_rgs} \
-             --output-fmt bam \
-             -r "ID:tso_${{barcode}}" \
-             {output.with_rgs_no_header} 
-           cp {output.with_rgs} {output.with_rgs_no_header}
-        
-        done < {input.filtered_barcodes}
+        done < {input.filtered_barcodes} > {output.header_barcodes}
+
+        samtools view {output.with_rgs_no_header} | \
+          cat {output.header} {output.header_barcodes} - | \
+          samtools view -Sb -@ {threads} | \
+          samtools sort -@ {threads}  > {output.with_rgs}
 
         """
 
 rule count_custom_regions_tso_no_module:
     input:
         bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso_rg.bam'),
-        # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
-        #gtf = config['gtf'],
         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
     output:
-        # merged_bam = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_tso_and_wta.bam'),
-        # merged_bam = temp(op.join(config['working_dir'], 'multimodal', '{sample}', config['final_merged_file'])),
-        # csv = temp(op.join(config['working_dir'], 'multimodal', '{sample}', 'final_bam_df.csv')),
         fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted')
     threads: config['nthreads']
     resources:
          mem_mb=config['max_mem_mb']
+    log: op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounts.log')
     params:
         featureCounts = config['featureCounts'],
         run_mode = config['run_mode'],
@@ -729,7 +522,7 @@ rule count_custom_regions_tso_no_module:
             shell ("""
             ulimit -v {params.max_mem}
             
-            ## featurecounts
+            ## featurecounts, notice the -M and -T and --fraction
             {params.featureCounts} \
                  -a {input.gtf} \
                  -o {output.fc} \
@@ -742,7 +535,7 @@ rule count_custom_regions_tso_no_module:
                  -M  \
                  -T {threads} \
                  --fraction \
-                 --byReadGroup
+                 --byReadGroup &> {log}
             """)
 
 rule retrieve_genome_sizes:
@@ -852,8 +645,8 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
 
 rule generate_sce:
     input:
-        tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        # tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        # wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted'),
         # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
         gtf = config['gtf'],
@@ -881,3 +674,26 @@ rule generate_sce:
              --output_fn {output.sce}
         """
 
+
+rule render_descriptive_report:
+    input:
+        gtf = config['gtf'],
+        script = op.join(config['rock_method_path'], 'main', 'process_sce_objects.Rmd'),
+        sces = expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
+               sample = get_sample_names())
+    output:
+        html = op.join(config['working_dir'], 'multimodal', 'descriptive_report.html')
+    log: op.join(config['working_dir'], 'multimodal', 'descriptive_report.log')
+    params:
+        multimodal_path = op.join(config['working_dir'], 'multimodal'),
+        run_mode = config['run_mode'],
+        working_dir = config['working_dir'],
+        sample = "{wildcards.sample}",
+        Rbin = config['Rbin']
+    shell:
+        """
+        {params.Rbin} -e 'rmarkdown::render(\"{input.script}\", 
+          output_file = \"{output.html}\", 
+          params = list(multimodal_path = \"{params.multimodal_path}\", 
+                        run_mode = \"{params.run_mode}\"))' &> {log}
+        """

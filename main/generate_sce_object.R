@@ -66,7 +66,13 @@ read_matrix <- function(mtx, cells, features, cell.column = 1, feature.column = 
 }
 
 read_featurecounts <- function(fn, wta_whitelist) {
-    mtso <- read.table(fn, header = TRUE, row.names = 1)
+    mtso <- read.table(fn, header = TRUE)
+    if (all(!duplicated(mtso$Geneid))) {
+        rownames(mtso) <- mtso$Geneid
+    } else {
+        rownames(mtso) <- sprintf('%s_%s:%s-%s', mtso$Geneid, mtso$Chr, mtso$Start, mtso$End)
+    }
+    
     colnames(mtso) <- sapply(strsplit(split = '.bam.', colnames(mtso)), function(x) return(x[2]))
 
     mtso <- mtso[,grep('tso', colnames(mtso))]
