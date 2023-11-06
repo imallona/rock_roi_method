@@ -4,13 +4,17 @@ This repository belongs to the rock and roi project from the University of Zuric
 
 This repository includes a Snakemake workflow to automate data processing from raw reads to count tables (and R `singleCellExperiment` objects) listing both on-target TSO and off-target WTA readouts. The software stack needed to run the method is containerized using Docker.
 
+# Components
+
 To analyze their data, users need to provide their sequencing files in fastq format (one for the cell barcode plus UMI; and another for the cDNA) and a configuration file specifying the experiment characteristics and extra information, including:
 
 1. A genome (fasta) to align the genome to (i.e. hg38, mm10 etc). The genome needs to contain all (ontarget) captured sequences, so if these do not belong to the standard genome (i.e. GFP, tdTomato) it needs to be updated to append the extra sequences.
 2. A gene annotation (GTF) whose features are quantified separately for WTA and TSO. It is expected to contain a whole transcriptome gene annotation (i.e. Gencode, Refseq etc) as well as an explicit definition of the rock and/or roi targets captured by the TSO. Instructions to build this GTF are included within the software’s documentation.
-3. A set of cell barcode whitelists following BDRhapsody’s standards (standard BDRhapsody cell barcodes are included within the software)
+3. A set of cell barcode whitelists (standard BDRhapsody cell barcodes are included within this repository)
 4. Parameters to fine tune CPU and memory usage.
 5. Parameters to fine tune the expected number of cells and other EmptyDrops parameters.
+
+# Workflow layout
 
 The workflow follows these steps:
 
@@ -26,20 +30,20 @@ Hence, our workflow always reports a WTA count table with as many genes as on-ta
 - `all`: produces both `tso off- and ontarget unique` and `tso ontarget multi` outputs.
 
 Finally, we generate an R SingleCellExperiment object with the aforementioned count tables and the following structure:
-- `wta` assay: raw counts from the WTA analysis.
+- `wta` assay: raw counts from the WTA analysis (unique reads).
 - (optional) `tso_off_and_ontarget_unique` assay: raw counts from the `tso off- and ontarget unique` or `all` run modes.
 - (optional) `tso_ontarget_multi` altExp alternative experiment: raw counts from the `tso ontarget multi` run mode.
 
 We also provide a simulation runmode to showcase the method, where raw reads (fastqs), genome and GTF are generated for three on-target features and one off-target features across hundreds of cells before running the method.
 
-## Repository structure
+# Repository structure
 
 - `data`: Contains BD Rhapsody whitelists and a bash script to generate fake data for run the method (in bash).
 - `main`: Contains the Snakemafile and python module to align and count both targeted and untargeted gene expression.
 
-## Snakefile layout
+# Snakefile layout
 
-### Without simulation
+## Without simulation
 
 ```
 ## i.e. 
@@ -49,19 +53,19 @@ snakemake -s main/Snakefile --configfile ~/src/rock_roi_paper/00_mixing_experime
 - Rulegraph: [png](./docs/rulegraph.png), [pdf](./docs/rulegraph.pdf), [specs](./docs/rulegraph).
 - DAG for a run with four samples: [png](./docs/dag.png), [pdf](./docs/rulegraph.pdf), [specs](./docs/rulegraph).
 
-### With simulation
+## With simulation
 
 
 - Rulegraph: [png](./docs/simul.png), [specs](./docs/rulegraph_simulation)
 - DAG: [specs](.docs/dag_simulation.gz) (gzip compressed- hundreds of cells)
 
-## Installs and/or running the method
+# Installs and/or running the method
 
 We asume a GNU/Linux system. We haven't tested it on Mac and it won't run on Windows.
 
 We provide a Dockerfile to define a suitable GNU/Linux environment to run our method.
 
-### Using docker
+## Using docker
 
 Assuming a single-threaded execution:
 
@@ -75,9 +79,13 @@ snakemake -p --cores 1 --configfile config.yaml
 
 ```
 
-### Installing and user the system's dependencies
+## Using conda
 
-#### STAR (STARsolo)
+Not available yet.
+
+## Compilling and installing dependencies directly
+
+### STAR (STARsolo)
 
 ```
 mkdir -p ~/soft/star
@@ -95,10 +103,10 @@ export PATH="$HOME"/soft/star/STAR-2.7.10b/source:$PATH
 
 ```
 
-#### Subread
+### Subread
 
 ```
-mkdir -p ~/soft/soft/subread
+mkdir -p ~/soft/subread
 cd $_
 wget 'https://sourceforge.net/projects/subread/files/subread-2.0.6/subread-2.0.6-source.tar.gz/download' 
 tar xzvf download 
@@ -106,10 +114,10 @@ cd subread-2.0.6-source/src
 make -f Makefile.Linux 
 
 ## assuming ~/.local/bin/ is part of the $PATH
-ln -s  ~/soft/soft/subread/subread-2.0.6-source/bin/featureCounts ~/.local/bin/featureCounts
+ln -s  ~/soft/subread/subread-2.0.6-source/bin/featureCounts ~/.local/bin/featureCounts
 ```
 
-#### Python dependencies
+### Python deps
 
 Including snakemake, pandas and deeptools.
 
@@ -122,16 +130,24 @@ cd /home/rock/main/module && \
 
 ```
 
-#### Bedtools
+### Bedtools
 
 ```
+mkdir -p ~/soft/bedtools
+cd $_
+wget https://github.com/arq5x/bedtools2/releases/download/v2.29.1/bedtools-2.29.1.tar.gz
+tar -zxvf bedtools-2.29.1.tar.gz
+cd bedtools2
+make
 
+## assuming ~/.local/bin/ is part of the $PATH
+cp bin/* ~/.local/bin/
 ```
 
 ### Kent utils
 
 ```
-cd ~/.bin # or somewhere in your $PTH
+cd ~/.local/bin # or somewhere in your $PATH where you can write
 
 wget https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v385/faSize
 chmod +x faSize
@@ -140,11 +156,11 @@ wget https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v385/bedGraphToBigWi
 chmod +x bedGraphToBigWig
 ```
 
-#### Running the method
+# Running the method
 
 ```
 cd main
-snakemake --cores 50 --configfile config.yaml
+snakemake --cores 50 --configfile config.yaml -p
 
 ```
 
@@ -157,8 +173,6 @@ Please check [our example config yaml](./main/config.yaml). **Important** This f
 ### Simulation
 
 We provide a data simulation procedure to be able to run the workflow on them. In brief, we aim to quantify in 2 cells a set of features: one is `offtarget` and captured by the WTA assay; and others are (multioverlapping, multimapper) `ontarget` readouts captured by the TSO assay.
-
-The rationale behind is: lorem ipsum.
 
 ### Picking up the right whitelist
 
@@ -182,16 +196,22 @@ ontarget        captured        exon    1030    1090    .       +       .       
 
 Then, edit the `config.yaml` file so the `capture_gtf_column_2_pattern` reads `captured`.
 
-## License
+# License
 
 GPLv3
+
+# Extra reading
+
+- https://github.com/imallona/rock_roi_paper Actual analysis using this method
+- (deprecated) https://gitlab.uzh.ch/izaskun.mallona/ebrunner_spectral
 
 ## Contributors
 
 - Izaskun Mallona 
-- Nidhi Agrawal (python counting module)
+- Nidhi Agrawal (python counting module, currently deprecated)
 - We reuse and adapt tools from STAR, subread (featurecounts), samtools and others; we are extremely grateful to their contributors for their unvaluable resources free and openly provided to the community
 
 ## Contact
 
-izaskun.mallona at gmail dot com
+izaskun.mallona at mls.uzh.ch
+
