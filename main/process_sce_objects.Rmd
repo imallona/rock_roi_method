@@ -37,6 +37,7 @@ print(params$run_mode)
 ```
 
 ```{r}
+
 ac <- function(col, alpha=1){
   apply(sapply(col, col2rgb)/255, 2, 
                      function(x) 
@@ -68,6 +69,10 @@ sces <- lapply(list.files(dp,
 ## combine sces
 ## sce <-  Reduce(cbind, sces)
 for (i in 1:length(sces)) {
+    colnames(sces[[i]]) <- paste0(dirname(list.files(dp,
+                                                     ".*sce.rds", recursive = TRUE)),
+                                          '_',
+                                          colnames(sces[[i]]))
     colData(sces[[i]])$experiment <- mainExpName(sces[[i]])
     colnames(rowData(sces[[i]])) <- c("name", "type", "value")
     rownames(sces[[i]]) <- paste0(rowData(sces[[i]])$name, "__", rownames(sces[[i]]))
@@ -228,7 +233,156 @@ for (id in unique(colData(sce)$experiment)) {
 } 
 ```
 
+## Quick clustering (WTA) {.tabset .tabset-pills}
 
+```{r}
+meta <- as.data.frame(t(assay(altExp(sce, 'tso_ontarget_multi'))))[rownames(colData(sce)),]
+colnames(meta) <- paste0('captured_', colnames(meta))
+
+so <- CreateSeuratObject(counts = assay(sce, 'wta'),
+                         project = "wta",
+                         meta.data = as.data.frame(cbind(colData(sce), meta)),
+                         min.cells = 0, min.features = 0,
+                         assay = 'RNA')
+
+rm(meta)
+```
+
+```{r}
+so <- NormalizeData(object = so, normalization.method = 'LogNormalize', scale.factor = 10000)
+so <- FindVariableFeatures(so, selection.method = "vst", nfeatures = 2000)
+
+so <-  ScaleData(so, features = rownames(so))
+
+so <- RunPCA(object = so,
+             features = VariableFeatures(so),
+             verbose = FALSE,
+             npcs = 50)
+
+```
+
+
+### Loadings
+
+```{r, fig.width = 12, fig.height = 8}
+VizDimLoadings(object = so, dims = 1:4)
+```
+
+### Elbow
+
+```{r, fig.width =4, fig.height = 4}
+print(ElbowPlot(object = so, ndims = 50))
+
+```
+
+```{r}
+dims <- 1:30
+```
+
+```{r, message = FALSE}
+
+so <- FindNeighbors(object = so, dims = dims)
+
+## (resolutions <- seq(0.2, 1.4, by = 0.6))
+resolutions <- c(0.1, 0.5)
+
+for (res in resolutions) {
+    so <- FindClusters(object = so, resolution = res)
+}
+
+```
+
+### PCA {.tabset .tabset-fade .tabset-pills}
+
+```{r, fig.width = 7, fig.height = 4, results='asis'}
+
+## print(colnames(so@meta.data))
+
+layers <- c("experiment",
+            grep('snn_res', colnames(so@meta.data), value = TRUE))
+
+for (item in layers){
+
+    cat('#### ', item, ' \n\n')
+    print(DimPlot(object = so, reduction = "pca", group.by = item, shuffle = TRUE) +
+          ggtitle(item) +
+          theme(legend.position="right", aspect.ratio = 1))
+    cat('\n\n')
+}
+
+cat('#### RNA counts \n\n')
+FeaturePlot(object = so, reduction = "pca", features = 'nCount_RNA') +
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+cat('#### Number of features \n\n')
+FeaturePlot(object = so, reduction = "pca", features = 'nFeature_RNA')+
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+cat('#### Percent mitochondrial reads \n\n')
+FeaturePlot(object = so, reduction = "pca", features = 'subsets_mito_percent')+
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+
+captures <- grep('captured', colnames(so@meta.data))
+for (item in captures){
+     tryCatch({   
+        cat('#### ', item, ' \n\n')
+        FeaturePlot(object = so, reduction = "pca", features = item)+
+            theme(legend.position="right", aspect.ratio = 1)
+        cat('\n\n')
+}, error = function(x) print(x))
+}
+
+
+```
+
+### UMAPs {.tabset .tabset-fade .tabset-pills}
+
+```{r, fig.width = 8, fig.height = 4, message = FALSE}
+so <- RunUMAP(object = so, reduction = "pca", 
+              dims = dims)
+```
+
+
+```{r, fig.width = 7, fig.height = 4, results='asis'}
+
+for (item in layers){
+    cat('#### ', item, ' \n\n')
+    print(DimPlot(object = so, reduction = "umap", group.by = item, shuffle = TRUE) +
+          ggtitle(item) +
+          theme(legend.position="right", aspect.ratio = 1))
+    cat('\n\n')
+}
+
+cat('#### RNA counts \n\n')
+FeaturePlot(object = so, reduction = "umap", features = 'nCount_RNA') +
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+cat('#### Number of features \n\n')
+FeaturePlot(object = so, reduction = "umap", features = 'nFeature_RNA') +
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+cat('#### Percent mitochondrial reads \n\n')
+FeaturePlot(object = so, reduction = "umap", features = 'subsets_mito_percent') +
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+for (item in captures){
+tryCatch({
+    
+    cat('#### ', item, ' \n\n')
+    FeaturePlot(object = so, reduction = "umap", features = item)+
+        theme(legend.position="right", aspect.ratio = 1)
+    cat('\n\n')
+    }, error = function(x) print(x))
+}
+
+```
 
 # TSO (on- and offtarget, unique) {.tabset .tabset-pills}
 
@@ -361,6 +515,158 @@ for (id in unique(colData(sce)$experiment)) {
 ```
 
 
+## Quick clustering (TSO on- and offtarget unique) {.tabset .tabset-pills}
+
+```{r}
+meta <- as.data.frame(t(assay(altExp(sce, 'tso_ontarget_multi'))))[rownames(colData(sce)),]
+colnames(meta) <- paste0('captured_', colnames(meta))
+
+so <- CreateSeuratObject(counts = assay(sce, 'tso_off_and_ontarget_unique'),
+                         project = "tso unique",
+                         meta.data = as.data.frame(cbind(colData(sce), meta)),
+                         min.cells = 0, min.features = 0,
+                         assay = 'RNA')
+
+rm(meta)
+```
+
+```{r}
+so <- NormalizeData(object = so, normalization.method = 'LogNormalize', scale.factor = 10000)
+so <- FindVariableFeatures(so, selection.method = "vst", nfeatures = 2000)
+
+so <-  ScaleData(so, features = rownames(so))
+
+so <- RunPCA(object = so,
+             features = VariableFeatures(so),
+             verbose = FALSE,
+             npcs = 50)
+
+```
+
+
+### Loadings
+
+```{r, fig.width = 12, fig.height = 8}
+VizDimLoadings(object = so, dims = 1:4)
+```
+
+### Elbow
+
+```{r, fig.width =4, fig.height = 4}
+print(ElbowPlot(object = so, ndims = 50))
+
+```
+
+```{r}
+dims <- 1:30
+```
+
+```{r, message = FALSE}
+
+so <- FindNeighbors(object = so, dims = dims)
+
+## (resolutions <- seq(0.2, 1.4, by = 0.6))
+resolutions <- c(0.1, 0.5)
+
+for (res in resolutions) {
+    so <- FindClusters(object = so, resolution = res)
+}
+
+```
+
+### PCA {.tabset .tabset-fade .tabset-pills}
+
+```{r, fig.width = 7, fig.height = 4, results='asis'}
+
+## print(colnames(so@meta.data))
+
+layers <- c("experiment",
+            grep('snn_res', colnames(so@meta.data), value = TRUE))
+
+for (item in layers){
+
+    cat('#### ', item, ' \n\n')
+    print(DimPlot(object = so, reduction = "pca", group.by = item, shuffle = TRUE) +
+          ggtitle(item) +
+          theme(legend.position="right", aspect.ratio = 1))
+    cat('\n\n')
+}
+
+cat('#### RNA counts \n\n')
+FeaturePlot(object = so, reduction = "pca", features = 'nCount_RNA') +
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+cat('#### Number of features \n\n')
+FeaturePlot(object = so, reduction = "pca", features = 'nFeature_RNA')+
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+cat('#### Percent mitochondrial reads \n\n')
+FeaturePlot(object = so, reduction = "pca", features = 'subsets_mito_percent')+
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+
+captures <- grep('captured', colnames(so@meta.data))
+for (item in captures){
+     tryCatch({   
+        cat('#### ', item, ' \n\n')
+        FeaturePlot(object = so, reduction = "pca", features = item)+
+            theme(legend.position="right", aspect.ratio = 1)
+        cat('\n\n')
+}, error = function(x) print(x))
+}
+
+
+```
+
+### UMAPs {.tabset .tabset-fade .tabset-pills}
+
+```{r, fig.width = 8, fig.height = 4, message = FALSE}
+so <- RunUMAP(object = so, reduction = "pca", 
+              dims = dims)
+```
+
+
+```{r, fig.width = 7, fig.height = 4, results='asis'}
+
+for (item in layers){
+    cat('#### ', item, ' \n\n')
+    print(DimPlot(object = so, reduction = "umap", group.by = item, shuffle = TRUE) +
+          ggtitle(item) +
+          theme(legend.position="right", aspect.ratio = 1))
+    cat('\n\n')
+}
+
+cat('#### RNA counts \n\n')
+FeaturePlot(object = so, reduction = "umap", features = 'nCount_RNA') +
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+cat('#### Number of features \n\n')
+FeaturePlot(object = so, reduction = "umap", features = 'nFeature_RNA') +
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+cat('#### Percent mitochondrial reads \n\n')
+FeaturePlot(object = so, reduction = "umap", features = 'subsets_mito_percent') +
+    theme(legend.position="right", aspect.ratio = 1)
+cat('\n\n')
+
+for (item in captures){
+tryCatch({
+    
+    cat('#### ', item, ' \n\n')
+    FeaturePlot(object = so, reduction = "umap", features = item)+
+        theme(legend.position="right", aspect.ratio = 1)
+    cat('\n\n')
+    }, error = function(x) print(x))
+}
+
+```
+
+
 # TSO ontarget
 
 ## Raw counts {.tabset .tabset-pills}
@@ -385,7 +691,20 @@ for (experiment in unique(colData(altExp(sce, 'tso_ontarget_multi'))$experiment)
 
 ## Detection rates {.tabset .tabset.pills}
 
-```{r}
+These are percentage of cells expressing each (captured) feature.
+
+```{r, results = 'asis'}
+for (experiment in unique(colData(altExp(sce, 'tso_ontarget_multi'))$experiment)) {
+    cat('### ', experiment, ' \n\n')
+    
+    idx <- colData(altExp(sce, 'tso_ontarget_multi'))$experiment == experiment
+    print(kable(apply(assay(altExp(sce[,idx], 'tso_ontarget_multi')),
+          1,
+          function(x) sum(x > 0)/sum(idx) * 100)))
+         
+
+    cat('\n\n')
+}
 
 ```
 
