@@ -326,12 +326,12 @@ FeaturePlot(object = so, reduction = "pca", features = 'subsets_mito_percent')+
 cat('\n\n')
 
 
-captures <- grep('captured', colnames(so@meta.data))
+captures <- grep('captured', colnames(so@meta.data), value = TRUE)
 for (item in captures){
      tryCatch({   
         cat('#### ', item, ' \n\n')
-        FeaturePlot(object = so, reduction = "pca", features = item)+
-            theme(legend.position="right", aspect.ratio = 1)
+        print(FeaturePlot(object = so, reduction = "pca", features = item)+
+              theme(legend.position="right", aspect.ratio = 1))
         cat('\n\n')
 }, error = function(x) print(x))
 }
@@ -376,8 +376,8 @@ for (item in captures){
 tryCatch({
     
     cat('#### ', item, ' \n\n')
-    FeaturePlot(object = so, reduction = "umap", features = item)+
-        theme(legend.position="right", aspect.ratio = 1)
+    print(FeaturePlot(object = so, reduction = "umap", features = item)+
+        theme(legend.position="right", aspect.ratio = 1))
     cat('\n\n')
     }, error = function(x) print(x))
 }

@@ -11,7 +11,7 @@ RUN apt-get update && \
 
 WORKDIR /home/rock
 COPY ./data data/
-COPY ./main main/
+COPY ./ .
 
 ## (_not_ rockandroi python module) python installs along with snakemake (and _not_ deeptools)
 
@@ -49,7 +49,7 @@ USER rock
 ENV PATH=/home/rock/soft/star/STAR-2.7.10b/source:$PATH
 RUN echo "export PATH=$PATH" >> ~/.bashrc
 
-## showcase the method with simulated data and using snakemake
+## showcase the method with simulated data and using snakemake (without conda)
 
-RUN cd /home/rock/main && \
-   snakemake --cores 1 --configfile config.yaml -p
+RUN cd /home/rock && \
+   snakemake -s Snakefile --cores 1 --configfile config.yaml -p

@@ -10,8 +10,7 @@
 import os.path as op
 
 configfile: "config.yaml"
-
-            
+           
 if config['simulate']:
     config['gtf'] = op.join(config['working_dir'], 'data', 'genome.gtf')
     config['genome'] = op.join(config['working_dir'], 'data', 'genome.fa')
@@ -27,7 +26,12 @@ if config['simulate']:
                              'whitelist': '96x3', 'expected_cells': 500}}]
     config['capture_gtf_column_2_pattern'] = 'captured'
     config['run_mode'] = 'all'
-    
+
+
+## to ease whitelists symlinking
+if not op.isabs(config['rock_method_path']):
+    config['rock_method_path'] = op.join(workflow.basedir, config['rock_method_path'])
+
 def get_sample_names():
     return([x['name'] for x in config['samples']])
 
@@ -70,6 +74,8 @@ rule all:
         #        sample = get_sample_names())
     
 rule index:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         gtf = config['gtf'],
         fa = config['genome']
@@ -186,6 +192,8 @@ ontarget\tcaptured\texon\t1030\t1090\t.\t+\t.\tgene_id "ontarget_2"; transcript_
         """
 
 rule simulate_fastqs:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         part_r1 = expand(op.join(config['working_dir'], 'data', '{sample}',
                                  'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz'),
@@ -264,19 +272,21 @@ def symlink_whitelist(sample):
     if get_barcode_whitelist_by_name(name = sample) == '96x3':
         for x in ['BD_CLS1.txt', 'BD_CLS2.txt', 'BD_CLS3.txt']:
             try:
-                os.symlink(src = op.join(config['whitelist_path'], 'whitelist_96x3', x),
+                os.symlink(src = op.join(config['rock_method_path'], 'data', 'whitelist_96x3', x),
                            dst = op.join(config['working_dir'], 'align_wta', sample, 'whitelists', x))
             except FileExistsError:
                 break
     elif get_barcode_whitelist_by_name(name = sample) == '384x3':
         for x in ['BD_CLS1.txt', 'BD_CLS2.txt', 'BD_CLS3.txt']:
             try:
-                os.symlink(src = op.join(config['whitelist_path'], 'whitelist_384x3', x),
+                os.symlink(src = op.join(config['rock_method_path'], 'data', 'whitelist_384x3', x),
                            dst = op.join(config['working_dir'], 'align_wta', sample, 'whitelists', x))
             except FileExistsError:
                 break
 
 rule prepare_whitelists:
+    # conda:
+    #     "envs/all_in_one.yaml"
     input:
         cbumi = lambda wildcards: get_cbumi_by_name(wildcards.sample),
         cdna = lambda wildcards: get_cdna_by_name(wildcards.sample)
@@ -292,6 +302,8 @@ rule prepare_whitelists:
 
 
 rule align_wta:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
         # r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
@@ -313,7 +325,6 @@ rule align_wta:
         index_path = op.join(config['working_dir'] , 'data', 'index'),
         STAR = config['STAR'],
         # num_cells = get_expected_cells_by_name("{sample}"),
-        num_cells = 2,
         tmp = op.join(config['working_dir'], 'tmp_align_wta_{sample}'),
         maxmem = config['max_mem_mb'] * 1024 * 1024,
         sjdbOverhang = config['sjdbOverhang']
@@ -349,7 +360,9 @@ rule align_wta:
 
         
 # rule generate_tso_whitelist_from_wta_filtered:
-#     input:
+#     conda:
+#        "envs/all_in_one.yaml"
+#    input:
 #         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
 #                                     'filtered', 'barcodes.tsv')
 #     output:
@@ -363,6 +376,8 @@ rule align_wta:
 #         """
         
 rule align_tso:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         cdna = lambda wildcards: get_cdna_by_name(wildcards.sample),
         cbumi = lambda wildcards: get_cbumi_by_name(wildcards.sample),
@@ -424,6 +439,8 @@ rule align_tso:
 ## this is a dirty workaround to reduce mem usage by selecting which chromosomes have 'captured' features
 ## @todo filter the coordinates, not only the chromosomes
 rule subset_chromosomes_for_custom_counting:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')
     output:
@@ -436,9 +453,23 @@ rule subset_chromosomes_for_custom_counting:
         pattern = config['capture_gtf_column_2_pattern'],
         temp_red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}',
                                'tmp_subset_{modality}.bam')
-    run:
-        if params.run_mode in ['all', 'tso ontarget multi']:
-            shell ("""
+    # run:
+    #     if params.run_mode in ['all', 'tso ontarget multi']:
+    #         shell ("""
+    #         grep {params.pattern} {params.gtf} | cut -f1 | sort | uniq  > {output.chrs}
+    #         captured=$(cat {output.chrs} | tr '\\n' ' ')
+
+    #         samtools index -@ {threads} {input.bam}
+
+    #         samtools view -h {input.bam}  $captured -@ {threads} | \
+    #             samtools view -Sb > {output.red_bam}
+    #         """)
+    shell:
+        """
+        run_mode={params.run_mode}
+
+        if [ "$run_mode" = "all" ] || [ "$run_mode" = "tso_ontarget_multi" ]
+        then
             grep {params.pattern} {params.gtf} | cut -f1 | sort | uniq  > {output.chrs}
             captured=$(cat {output.chrs} | tr '\\n' ' ')
 
@@ -446,9 +477,12 @@ rule subset_chromosomes_for_custom_counting:
 
             samtools view -h {input.bam}  $captured -@ {threads} | \
                 samtools view -Sb > {output.red_bam}
-            """)
+        fi
+        """
 
 rule subset_gtf_for_custom_counting:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         gtf = config['gtf']
     output:
@@ -462,6 +496,8 @@ rule subset_gtf_for_custom_counting:
         """
 
 rule add_readgroups_to_bam:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         without_rgs = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam'),
         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
@@ -503,6 +539,8 @@ rule add_readgroups_to_bam:
         """
 
 rule count_custom_regions_tso_no_module:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso_rg.bam'),
         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
@@ -519,9 +557,32 @@ rule count_custom_regions_tso_no_module:
         max_mem = lambda wildcards, resources: resources.mem_mb * 1024,
         t = config['featurecounts_t'],
         g = config['featurecounts_g']
-    run:
-        if params.run_mode in ['all', 'tso ontarget multi']:
-            shell ("""
+    # run:
+    #     if params.run_mode in ['all', 'tso ontarget multi']:
+    #         shell ("""
+    #         ulimit -v {params.max_mem}
+            
+    #         ## featurecounts, notice the -M and -T and --fraction
+    #         {params.featureCounts} \
+    #              -a {input.gtf} \
+    #              -o {output.fc} \
+    #              {input.bam} \
+    #              -F GTF \
+    #              -t {params.t} \
+    #              -g {params.g} \
+    #              -f \
+    #              -O \
+    #              -M  \
+    #              -T {threads} \
+    #              --fraction \
+    #              --byReadGroup &> {log}
+    #         """)
+    shell:
+        """
+        run_mode={params.run_mode}
+
+        if [ "$run_mode" = "all" ] || [ "$run_mode" = "tso_ontarget_multi" ]
+        then
             ulimit -v {params.max_mem}
             
             ## featurecounts, notice the -M and -T and --fraction
@@ -538,9 +599,12 @@ rule count_custom_regions_tso_no_module:
                  -T {threads} \
                  --fraction \
                  --byReadGroup &> {log}
-            """)
-
+        fi
+        """
+        
 rule retrieve_genome_sizes:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         fa = config['genome']
     params:
@@ -553,6 +617,8 @@ rule retrieve_genome_sizes:
         """
         
 rule create_deduped_coverage_tracks_all_filtered_in_cbs:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
@@ -603,7 +669,9 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         """
 
 # rule create_deduped_coverage_tracks_single_cb:
-#     input:
+#     conda:
+#        "envs/all_in_one.yaml"
+#    input:
 #         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
 #         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
 #                                  'filtered', 'barcodes.tsv')
@@ -646,13 +714,15 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
 
 
 rule generate_sce:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         # tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         # wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted'),
         # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
         gtf = config['gtf'],
-        script = op.join(config['rock_method_path'], 'main', 'generate_sce_object.R')
+        script = op.join(config['rock_method_path'], 'generate_sce_object.R')
     output:
         sce = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds')
     params:
@@ -678,13 +748,17 @@ rule generate_sce:
 
 
 rule render_descriptive_report:
+    conda:
+        "envs/all_in_one.yaml"
     input:
         gtf = config['gtf'],
-        script = op.join(config['rock_method_path'], 'main', 'process_sce_objects.Rmd'),
+        script = op.join(config['rock_method_path'], 'process_sce_objects.Rmd'),
         sces = expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
                sample = get_sample_names())
     output:
-        html = op.join(config['working_dir'], 'multimodal', 'descriptive_report.html')
+        html = op.join(config['working_dir'], 'multimodal', 'descriptive_report.html'),
+        cache = temp(op.join(config['rock_method_path'], 'process_sce_objects_cache')),
+        cached_files = temp(op.join(config['rock_method_path'], 'process_sce_objects_files'))
     log: op.join(config['working_dir'], 'multimodal', 'descriptive_report.log')
     params:
         multimodal_path = op.join(config['working_dir'], 'multimodal'),

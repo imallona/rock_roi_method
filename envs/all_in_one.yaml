@@ -1,0 +1,19 @@
+name: rock_roi
+channel_priority: true
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - star=2.7.11a
+  - bedtools=2.31.1
+  - subread=2.0.6
+  # - snakemake=7.32.4
+  - kent=1.1.0
+  - bioconductor-singlecellexperiment=1.22.0
+  - bioconductor-scater=1.28.0
+  - r-seuratobject=5.0.0
+  - r-seurat=4.4.0
+  - bioconductor-scater=1.28.0
+  - bioconductor-scuttle=1.10.1
+  - r-ggplot2=3.4.4

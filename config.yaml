@@ -1,9 +1,6 @@
 ## simulate: True generates fake data and runs the pipeline
 simulate: True
 
-## where outputs will be generated at
-working_dir: work
-
 ## software stack, will work out of the box if within the supplied docker container
 Rbin: R
 STAR: STAR
@@ -18,12 +15,12 @@ nthreads: 2
 per_task_max_nthreads: 5
 max_mem_mb: 20000 ## these are megabytes
 
-## Path to whitelists directory (we assume we're currently inside folder `main`)
-##  the pre-filled paths point to Docker paths
-whitelist_path: '/home/rock/data'
+## full or relative path to the `root` of the rock_roi_method cloned repository
+rock_method_path: "."
 
-## path to the `root` of the rock_roi_method cloned repository
-rock_method_path: '/home/rock'
+## full or relative path where outputs will be generated at
+working_dir: work
+
 
 ## fill below these line if `simulate : False` -----------------------------------------
 ## if `simulate: True` then all config below this line will be replaced by

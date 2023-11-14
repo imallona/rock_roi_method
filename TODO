@@ -5,3 +5,6 @@
 - (izaskun, mid) speed up MM reading for TSO on- and off-target
 - (izaskun, low) gather specs on whether adding an altExp of WTA with multimap-, multivoerlapping reads
 - (izaskun, high) add the expected cell number into the starsolo call
+- parameter to disable UMI heuristics (sorting before uniq)
+- clearly document the threads/cores/max pertask features
+- find a workaround for Seurat <-> Matrix incompatibilities  https://community.rstudio.com/t/seurat-functions-throwing-error-messages-due-to-conflicting-packages/176936/3

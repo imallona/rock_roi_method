@@ -81,9 +81,13 @@ snakemake -p --cores 1 --configfile config.yaml
 
 ## Using conda
 
-Not available yet.
+(undocumented)
 
-## Compilling and installing dependencies directly
+```
+snakemake -s Snakefile --configfile config.yaml --use-conda --cores 2
+```
+
+## Compiling and installing dependencies directly
 
 ### STAR (STARsolo)
 
