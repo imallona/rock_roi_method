@@ -8,3 +8,4 @@
 - parameter to disable UMI heuristics (sorting before uniq)
 - clearly document the threads/cores/max pertask features
 - find a workaround for Seurat <-> Matrix incompatibilities  https://community.rstudio.com/t/seurat-functions-throwing-error-messages-due-to-conflicting-packages/176936/3
+- update docs PNGs/DAGs

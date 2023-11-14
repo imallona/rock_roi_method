@@ -712,7 +712,27 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         
 #         """
 
+rule install_r_deps:
+    conda:
+        "envs/all_in_one.yaml"
+    input:
+        script = op.join(config['rock_method_path'], 'installs.R')
+    output:
+        log = op.join(config['working_dir'], 'log', 'installs.log')
+    params:
+        run_mode = config['run_mode'],
+        working_dir = config['working_dir'],
+        sample = "{wildcards.sample}",
+        Rbin = config['Rbin'],
+        log_path = op.join(config['working_dir'], 'log')
+    shell:
+        """
+        mkdir -p {params.log_path}
 
+        {params.Rbin} -q --no-save --no-restore --slave \
+             -f {input.script} &> {output.log}
+        """
+        
 rule generate_sce:
     conda:
         "envs/all_in_one.yaml"
@@ -722,7 +742,8 @@ rule generate_sce:
         fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted'),
         # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
         gtf = config['gtf'],
-        script = op.join(config['rock_method_path'], 'generate_sce_object.R')
+        script = op.join(config['rock_method_path'], 'generate_sce_object.R'),
+        installs = op.join(config['working_dir'], 'log', 'installs.log')
     output:
         sce = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds')
     params:
@@ -754,7 +775,8 @@ rule render_descriptive_report:
         gtf = config['gtf'],
         script = op.join(config['rock_method_path'], 'process_sce_objects.Rmd'),
         sces = expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
-               sample = get_sample_names())
+               sample = get_sample_names()),
+        installs = op.join(config['working_dir'], 'log', 'installs.log')
     output:
         html = op.join(config['working_dir'], 'multimodal', 'descriptive_report.html'),
         cache = temp(op.join(config['rock_method_path'], 'process_sce_objects_cache')),
