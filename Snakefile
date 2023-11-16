@@ -712,6 +712,8 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         
 #         """
 
+## yes the log is considered an output - to pass as a flag
+## R_LIBS are conda's if run in conda, but /home/rock/R_LIBs if run in docker, and user's if run directly
 rule install_r_deps:
     conda:
         "envs/all_in_one.yaml"
@@ -787,11 +789,23 @@ rule render_descriptive_report:
         run_mode = config['run_mode'],
         working_dir = config['working_dir'],
         sample = "{wildcards.sample}",
-        Rbin = config['Rbin']
+        Rbin = config['Rbin'],
+        simulate = config['simulate']
     shell:
         """
+        simulate={params.simulate}
+
+        if [ "$simulate" = "False" ]
+        then
+
         {params.Rbin} -e 'rmarkdown::render(\"{input.script}\", 
           output_file = \"{output.html}\", 
           params = list(multimodal_path = \"{params.multimodal_path}\", 
                         run_mode = \"{params.run_mode}\"))' &> {log}
+        else
+          echo "no report - that just just a simulation; but SCE objects are ready" > {output.html}
+          touch {output.cache}
+          touch {output.cached_files}
+        fi
+
         """

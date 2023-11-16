@@ -17,3 +17,4 @@ dependencies:
   - bioconductor-scater=1.28.0
   - bioconductor-scuttle=1.10.1
   - r-ggplot2=3.4.4
+  - r-biocmanager=1.30.22

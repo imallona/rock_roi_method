@@ -15,10 +15,12 @@ COPY ./ .
 
 ## (_not_ rockandroi python module) python installs along with snakemake (and _not_ deeptools)
 
-RUN cd /home/rock/main/module && \
-    # pip install -r rock_n_roi_requirements.txt && \
-    mkdir -p data && \
-    pip install snakemake pandas # deeptools
+# RUN cd /home/rock/main/module && \
+#     # pip install -r rock_n_roi_requirements.txt && \
+#     mkdir -p data && \
+#     pip install snakemake pandas # deeptools
+
+RUN pip install snakemake pandas
 
 # STAR, subread and R packages installs
 
@@ -45,6 +47,12 @@ RUN mkdir -p /home/rock/soft/star && \
     chmod +x bedGraphToBigWig
     
 USER rock
+
+ENV R_LIBS_USER=/home/rock/Rlibs:/usr/local/lib/R/site-library:/usr/local/lib/R/library
+ENV R_LIBS=$R_LIBS_USER
+
+RUN export R_LIBS && \
+    mkdir -p /home/rock/Rlibs
 
 ENV PATH=/home/rock/soft/star/STAR-2.7.10b/source:$PATH
 RUN echo "export PATH=$PATH" >> ~/.bashrc
