@@ -359,21 +359,25 @@ rule align_wta:
         """
 
         
-# rule generate_tso_whitelist_from_wta_filtered:
-#     conda:
-#        "envs/all_in_one.yaml"
-#    input:
-#         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
-#                                     'filtered', 'barcodes.tsv')
-#     output:
-#         tso_whitelist = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist.txt')
-#     params:
-#         path = op.join(config['working_dir'], 'data', '{sample}')
-#     shell:
-#         """
-#         mkdir -p {params.path}
-#         awk -F "_" '{{print $1"AATG"$2"CCAC"$3}}' {input.filtered_barcodes} > {output.tso_whitelist}
-#         """
+rule generate_tso_whitelist_from_wta_filtered:
+    conda:
+        "envs/all_in_one.yaml"
+    input:
+        filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+                                    'filtered', 'barcodes.tsv')
+    output:
+        tso_w1 = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist_1.txt'),
+        tso_w2 = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist_2.txt'),
+        tso_w3 = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist_3.txt')
+    params:
+        path = op.join(config['working_dir'], 'data', '{sample}')
+    shell:
+        """
+        mkdir -p {params.path}
+        awk -F "_" '{{print $1}}' {input.filtered_barcodes} > {output.tso_w1}
+        awk -F "_" '{{print $2}}' {input.filtered_barcodes} > {output.tso_w2}
+        awk -F "_" '{{print $3}}' {input.filtered_barcodes} > {output.tso_w3}
+        """
         
 rule align_tso:
     conda:
@@ -385,9 +389,12 @@ rule align_tso:
         gtf = config['gtf'],
         # filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
         #                             'filtered', 'barcodes.tsv'),
-        cb1 = op.join(config['working_dir'], 'align_wta', "{sample}",  'whitelists', 'BD_CLS1.txt'),
-        cb2 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS2.txt'),
-        cb3 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS3.txt')
+        # cb1 = op.join(config['working_dir'], 'align_wta', "{sample}",  'whitelists', 'BD_CLS1.txt'),
+        # cb2 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS2.txt'),
+        # cb3 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS3.txt')
+        cb1 = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist_1.txt'),
+        cb2 = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist_2.txt'),
+        cb3 = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist_3.txt')
     output:
         #bam = temp(op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'))
         bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam')
