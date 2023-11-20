@@ -39,7 +39,7 @@ We also provide a simulation runmode to showcase the method, where raw reads (fa
 # Repository structure
 
 - `data`: Contains BD Rhapsody whitelists and a bash script to generate fake data for run the method (in bash).
-- `main`: Contains the Snakemafile and python module to align and count both targeted and untargeted gene expression.
+- `.`: Contains the Snakefile and R scripts to obtain both targeted and untargeted gene expression data.
 
 # Snakefile layout
 
@@ -47,7 +47,7 @@ We also provide a simulation runmode to showcase the method, where raw reads (fa
 
 ```
 ## i.e. 
-snakemake -s main/Snakefile --configfile ~/src/rock_roi_paper/00_mixing_experiment/mixing_conf.yaml  --dag
+snakemake -s Snakefile --configfile ~/src/rock_roi_paper/00_mixing_experiment/mixing_conf.yaml  --dag
 ```
 
 - Rulegraph: [png](./docs/rulegraph.png), [pdf](./docs/rulegraph.pdf), [specs](./docs/rulegraph).
@@ -74,16 +74,19 @@ docker build . -t rock && docker run -it --entrypoint /bin/bash rock
 
 ## once inside the `rock` container
 
-cd main
 snakemake -p --cores 1 --configfile config.yaml
 
 ```
 
 ## Using conda
 
-Not available yet.
+(undocumented)
 
-## Compilling and installing dependencies directly
+```
+snakemake -s Snakefile --configfile config.yaml --use-conda --cores 2
+```
+
+## Compiling and installing dependencies directly
 
 ### STAR (STARsolo)
 
@@ -124,9 +127,8 @@ Including snakemake, pandas and deeptools.
 Caution this will use the system's pip and current pythonpath; using a virtualenv is advised.
 
 ```
-cd /home/rock/main/module && \
-    # pip install -r rock_n_roi_requirements.txt && \
-    pip install snakemake pandas # deeptools
+
+pip install snakemake pandas # deeptools
 
 ```
 
@@ -156,10 +158,10 @@ wget https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v385/bedGraphToBigWi
 chmod +x bedGraphToBigWig
 ```
 
-# Running the method
+# Running the method (without conda)
 
 ```
-cd main
+
 snakemake --cores 50 --configfile config.yaml -p
 
 ```
@@ -168,7 +170,7 @@ snakemake --cores 50 --configfile config.yaml -p
 
 ### Writing a config file for snakemake
 
-Please check [our example config yaml](./main/config.yaml). **Important** This file must be named `config.yaml`.
+Please check [our example config yaml](config.yaml). **Important** This file must be named `config.yaml`.
 
 ### Simulation
 

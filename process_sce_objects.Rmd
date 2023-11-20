@@ -49,6 +49,7 @@ ac <- function(col, alpha=1){
 ```{r}
 knitr::opts_chunk$set(fig.width = 5,
                       fig.height = 5,
+                      error = TRUE,
                       cache = TRUE,
                       include = TRUE,
                       dev = "png",
@@ -56,6 +57,11 @@ knitr::opts_chunk$set(fig.width = 5,
                       cache.lazy = FALSE,
                       warning = TRUE,
                       message = TRUE)
+
+## render on error hook
+knitr::knit_hooks$set(error = function(x) {
+  knitr::knit_exit()
+})
 ```
 
 ```{r}
@@ -326,12 +332,12 @@ FeaturePlot(object = so, reduction = "pca", features = 'subsets_mito_percent')+
 cat('\n\n')
 
 
-captures <- grep('captured', colnames(so@meta.data))
+captures <- grep('captured', colnames(so@meta.data), value = TRUE)
 for (item in captures){
      tryCatch({   
         cat('#### ', item, ' \n\n')
-        FeaturePlot(object = so, reduction = "pca", features = item)+
-            theme(legend.position="right", aspect.ratio = 1)
+        print(FeaturePlot(object = so, reduction = "pca", features = item)+
+              theme(legend.position="right", aspect.ratio = 1))
         cat('\n\n')
 }, error = function(x) print(x))
 }
@@ -376,8 +382,8 @@ for (item in captures){
 tryCatch({
     
     cat('#### ', item, ' \n\n')
-    FeaturePlot(object = so, reduction = "umap", features = item)+
-        theme(legend.position="right", aspect.ratio = 1)
+    print(FeaturePlot(object = so, reduction = "umap", features = item)+
+        theme(legend.position="right", aspect.ratio = 1))
     cat('\n\n')
     }, error = function(x) print(x))
 }
