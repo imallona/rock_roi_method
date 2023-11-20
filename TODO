@@ -1,14 +1,8 @@
 - (mark, high) coverage tracks: reduce the CB scope to filtered-in-after-proper-QC
-- (izaskun, low) decide what to do with Nidhi's
-- (izaskun, mid) gather overall reports specs - what to include as diagnosis/QC?
 - (mark, high) add extra rowData to the SCEs using the GTF info
-- (izaskun, mid) speed up MM reading for TSO on- and off-target
 - (izaskun, low) gather specs on whether adding an altExp of WTA with multimap-, multivoerlapping reads
 - (izaskun, high) add the expected cell number into the starsolo call
-- parameter to disable UMI heuristics (sorting before uniq)
 - clearly document the threads/cores/max pertask features
-- find a workaround for Seurat <-> Matrix incompatibilities  https://community.rstudio.com/t/seurat-functions-throwing-error-messages-due-to-conflicting-packages/176936/3
 - update docs PNGs/DAGs
-- filter TSO CBs again
 - add QC stats reporting fastq number, filtered in at each step, etc
-- fix the Dockerfile? if broken
+- ~~fix the Dockerfile? if broken~~

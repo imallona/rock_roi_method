@@ -55,6 +55,17 @@ def get_barcode_whitelist_by_name(name):
         if config['samples'][i]['name'] == name:
              return(config['samples'][i]['uses']['whitelist'])
 
+def get_chromosomes(wildcards):
+    # with open(op.join(config['working_dir'], 'data', 'chrom.sizes')) as fh:
+    # with open(chromsizes_fn) as fh:
+    fn = checkpoints.retrieve_genome_sizes.get(**wildcards).output[0]
+    with open(fn) as fh:
+        return(list(line.strip().split('\t')[0] for line in fh))
+
+def list_by_chr_dedup_bams(wildcards):
+    chroms = get_chromosomes(wildcards)
+    return(chrom + '_cb_umi_deduped.bam' for chrom in chroms)
+
 print(get_sample_names())
          
 ## canonical CB 9-mers or just A{9}
@@ -355,6 +366,8 @@ rule align_wta:
      --sjdbOverhang {params.sjdbOverhang} \
      --limitBAMsortRAM {params.maxmem}
 
+    samtools index -@ {threads} {output.bam} 
+
     rm -rf {params.tmp}
         """
 
@@ -438,6 +451,8 @@ rule align_tso:
         --outTmpDir {params.tmp} \
         --sjdbOverhang {params.sjdbOverhang} \
         --limitBAMsortRAM {params.maxmem}
+
+        samtools index -@ {threads} {output.bam} 
 
         rm -rf {params.tmp}
         """
@@ -609,7 +624,7 @@ rule count_custom_regions_tso_no_module:
         fi
         """
         
-rule retrieve_genome_sizes:
+checkpoint retrieve_genome_sizes:
     conda:
         "envs/all_in_one.yaml"
     input:
@@ -622,12 +637,78 @@ rule retrieve_genome_sizes:
         """
         {params.faSize} -detailed -tab {input.fa} > {output}
         """
-        
-rule create_deduped_coverage_tracks_all_filtered_in_cbs:
+
+## by chrom
+rule split_by_chr:
     conda:
         "envs/all_in_one.yaml"
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+                                 'filtered', 'barcodes.tsv')
+    output:
+        mini = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                            '{chrom}_subset.bam'))
+        # sorted = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+        #                     '{chrom}_cb_umi_sorted.bam'))
+    threads: 1
+    shell:
+        """
+        samtools view -h -b {input.bam} {wildcards.chrom} > {output.mini}      
+        """
+## by chrom
+rule dedup_by_cb_umi_gx:
+    conda:
+        "envs/all_in_one.yaml"
+    input:
+        # bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        mini = op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                            '{chrom}_subset.bam'),
+        chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
+    output:
+        cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                            '{chrom}_cb_umi_deduped.bam')),
+        header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                            '{chrom}_cb_umi_deduped_header.txt'))
+    threads: 1
+    shell:
+        """
+        samtools view -H {input.mini} > {output.header}
+
+        # 20 gx (gene id)
+        # 27 CB (error corrected CB)
+        # 28 UB (error corrected UMI)
+        # the chromosome is implicit - from the per-chr run
+        samtools view {input.mini} |  sort -k27 -k28 -k 20 -u | cat {output.header} - | \
+           samtools view -Sbh > {output.cb_ub_bam}  
+
+        """
+
+rule merge_deduped_bams:
+    conda:
+        "envs/all_in_one.yaml"
+    input:
+        # chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes'),
+        # bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        bams = lambda wildcards: [op.join(config['working_dir'], 'align_{modality}', '{sample}', x) for x in list_by_chr_dedup_bams(wildcards)]
+    output:
+        unsorted = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                'cb_ub_filt_unsorted.bam')),
+        merged = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')
+    threads:
+        config['nthreads']
+    shell:
+        """
+        samtools merge -@ {threads} -o {output.unsorted} {input.bams}
+        samtools sort -@ {threads} {output.unsorted} -o {output.merged}
+
+        """
+
+rule create_deduped_coverage_tracks_all_filtered_in_cbs:
+    conda:
+        "envs/all_in_one.yaml"
+    input:
+        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam'),
         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                  'filtered', 'barcodes.tsv'),
         chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
@@ -639,11 +720,8 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         bedtools = config['bedtools'],
         bedGraphToBigWig = config['bedGraphToBigWig']        
     output:
-        cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_filt.bam')),
-        cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')),
-        header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'header')),
-        cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bw')),
-        bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw')
+        bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
+        cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bw'))
     shell:
         """
         ## this is unrelated to the bamgeneration; fixes starsolo's default permissions
@@ -654,17 +732,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         ## CB are the error-corrected barcodes
         samtools view -h -@ {threads} {input.bam} -D CB:{input.valid_barcodes} \
            -o {output.cb_bam}
-
-        ## second, deduplicate by UB (error corrected barcodes)
-        ##  so it gets only one alignment per UB:locus:CB combination
-        # 27 CB (error corrected CB)
-        # 28 UB (error corrected UMI)
-        # mind the file is coordinate sorted already - so we deduplicate based on columns 27 and 28
-        samtools view -H {output.cb_bam} > {output.header}
-
-        samtools view {output.cb_bam} -@ {threads} | uniq -f26 | cat {output.header} - | \
-          samtools view -Sb -@ {threads} > {output.cb_ub_bam}
-
+        
         samtools index -@ {threads} {output.cb_ub_bam}
 
         {params.bedtools} genomecov -ibam {output.cb_ub_bam} \
@@ -674,6 +742,58 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         {params.bedGraphToBigWig} {output.cb_ub_bg} {input.chromsizes} {output.bw}
         
         """
+        
+# rule create_deduped_coverage_tracks_all_filtered_in_cbs:
+#     conda:
+#         "envs/all_in_one.yaml"
+#     input:
+#         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+#         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+#                                  'filtered', 'barcodes.tsv'),
+#         chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
+#     threads:
+#         config['nthreads']
+#     params:
+#         # bamCoverage = config['bamCoverage'],
+#         binSize = 10,
+#         bedtools = config['bedtools'],
+#         bedGraphToBigWig = config['bedGraphToBigWig']        
+#     output:
+#         cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_filt.bam')),
+#         cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')),
+#         header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'header')),
+#         cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bw')),
+#         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw')
+#     shell:
+#         """
+#         ## this is unrelated to the bamgeneration; fixes starsolo's default permissions
+#         chmod -R ug+rwX $(dirname {input.bam})
+
+#         ## first filter in 'valid' CBs
+
+#         ## CB are the error-corrected barcodes
+#         samtools view -h -@ {threads} {input.bam} -D CB:{input.valid_barcodes} \
+#            -o {output.cb_bam}
+
+#         ## second, deduplicate by UB (error corrected barcodes)
+#         ##  so it gets only one alignment per UB:locus:CB combination
+#         # 27 CB (error corrected CB)
+#         # 28 UB (error corrected UMI)
+#         # mind the file is coordinate sorted already - so we deduplicate based on columns 27 and 28
+#         samtools view -H {output.cb_bam} > {output.header}
+
+#         samtools view {output.cb_bam} -@ {threads} | uniq -f26 | cat {output.header} - | \
+#           samtools view -Sb -@ {threads} > {output.cb_ub_bam}
+
+#         samtools index -@ {threads} {output.cb_ub_bam}
+
+#         {params.bedtools} genomecov -ibam {output.cb_ub_bam} \
+#             -bg -split | LC_COLLATE=C sort -k1,1 -k2,2n > {output.cb_ub_bg}
+
+#         ## bedgraph to bigwig
+#         {params.bedGraphToBigWig} {output.cb_ub_bg} {input.chromsizes} {output.bw}
+        
+#         """
 
 # rule create_deduped_coverage_tracks_single_cb:
 #     conda:
