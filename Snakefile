@@ -560,18 +560,18 @@ rule add_readgroups_to_bam:
 
         """
 
-rule count_custom_regions_tso_no_module:
+rule count_custom_regions_no_module:
     conda:
         "envs/all_in_one.yaml"
     input:
-        bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'subset_tso_rg.bam'),
+        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}_rg.bam'),
         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
     output:
-        fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted')
-    threads: config['nthreads']
+        fc = op.join(config['working_dir'], 'multimodal', '{sample}', '{modality}_featurecounted')
+    threads: min(64, config['nthreads']) # featurecounts has a max 64 for -T
     resources:
          mem_mb=config['max_mem_mb']
-    log: op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounts.log')
+    log: op.join(config['working_dir'], 'multimodal', '{sample}', '{modality}_featurecounts.log')
     params:
         featureCounts = config['featureCounts'],
         run_mode = config['run_mode'],
@@ -579,26 +579,6 @@ rule count_custom_regions_tso_no_module:
         max_mem = lambda wildcards, resources: resources.mem_mb * 1024,
         t = config['featurecounts_t'],
         g = config['featurecounts_g']
-    # run:
-    #     if params.run_mode in ['all', 'tso ontarget multi']:
-    #         shell ("""
-    #         ulimit -v {params.max_mem}
-            
-    #         ## featurecounts, notice the -M and -T and --fraction
-    #         {params.featureCounts} \
-    #              -a {input.gtf} \
-    #              -o {output.fc} \
-    #              {input.bam} \
-    #              -F GTF \
-    #              -t {params.t} \
-    #              -g {params.g} \
-    #              -f \
-    #              -O \
-    #              -M  \
-    #              -T {threads} \
-    #              --fraction \
-    #              --byReadGroup &> {log}
-    #         """)
     shell:
         """
         run_mode={params.run_mode}
@@ -737,7 +717,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         bedtools = config['bedtools'],
         bedGraphToBigWig = config['bedGraphToBigWig']        
     output:
-        cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')),
+        cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt_twice.bam')),
         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
         cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bw'))
     shell:
@@ -884,10 +864,8 @@ rule generate_sce:
     conda:
         "envs/all_in_one.yaml"
     input:
-        # tso_bam = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        # wta_bam = op.join(config['working_dir'], 'align_wta', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'featurecounted'),
-        # config = op.join(config['working_dir'], 'multimodal', '{sample}', 'config.yaml'),
+        tso_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'tso_featurecounted'),
+        wta_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'wta_featurecounted'),
         gtf = config['gtf'],
         script = op.join(config['rock_method_path'], 'generate_sce_object.R'),
         installs = op.join(config['working_dir'], 'log', 'installs.log')

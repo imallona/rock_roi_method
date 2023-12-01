@@ -106,16 +106,20 @@ wta <- read_matrix(mtx = file.path(wd, 'align_wta', id,  'Solo.out', 'Gene', 'fi
 wta_feat <- read.table(file.path(wd, 'align_wta', id,  'Solo.out', 'Gene', 'filtered', 'features.tsv'),
                        row.names = 1,
                        header = FALSE)
+
 colnames(wta_feat) <- c("name", "type", "value")
 
 ## wta end
 
 if (args$run_mode == 'tso_ontarget_multi') {
-    mtso <- read_featurecounts(file.path(wd, 'multimodal', id, 'featurecounted'),
+    mtso <- read_featurecounts(file.path(wd, 'multimodal', id, 'tso_featurecounted'),
+                               wta_whitelist = colnames(wta))
+    mwta <- read_featurecounts(file.path(wd, 'multimodal', id, 'wta_featurecounted'),
                                wta_whitelist = colnames(wta))
     
     (sce <- SingleCellExperiment(assays = list(wta = wta),
-                                 altExps = list(tso_ontarget_multi = SummarizedExperiment(mtso)),
+                                 altExps = list(wta_ontarget_multi = SummarizedExperiment(mwta),
+                                                tso_ontarget_multi = SummarizedExperiment(mtso)),
                                  mainExpName = id,
                                  rowData = wta_feat))
 
@@ -134,7 +138,9 @@ if (args$run_mode == 'tso_ontarget_multi') {
                             rowData = wta_feat))
 } else if (args$run_mode == 'all') {
 
-    mtso <- read_featurecounts(file.path(wd, 'multimodal', id, 'featurecounted'),
+    mtso <- read_featurecounts(file.path(wd, 'multimodal', id, 'tso_featurecounted'),
+                               wta_whitelist = colnames(wta))
+    mwta <- read_featurecounts(file.path(wd, 'multimodal', id, 'wta_featurecounted'),
                                wta_whitelist = colnames(wta))
     
     utso <- read_matrix(mtx = file.path(wd, 'align_tso', id,  'Solo.out', 'Gene', 'raw', 'matrix.mtx'),
@@ -145,9 +151,9 @@ if (args$run_mode == 'tso_ontarget_multi') {
                    modality = 'tso',
                    wta_whitelist = colnames(wta))
 
-
     (sce <- SingleCellExperiment(assays = list(wta = wta, tso_off_and_ontarget_unique = utso),
-                                 altExps = list(tso_ontarget_multi = SummarizedExperiment(mtso)),
+                                 altExps = list(wta_ontarget_multi = SummarizedExperiment(mwta),
+                                                tso_ontarget_multi = SummarizedExperiment(mtso)),
                                  mainExpName = id,
                                  rowData = wta_feat))
 }
