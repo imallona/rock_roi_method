@@ -18,3 +18,4 @@ dependencies:
   - bioconductor-scuttle=1.10.1
   - r-ggplot2=3.4.4
   - r-biocmanager=1.30.22
+  #- ucsc-fasize=377

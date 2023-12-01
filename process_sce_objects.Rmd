@@ -50,6 +50,7 @@ ac <- function(col, alpha=1){
 knitr::opts_chunk$set(fig.width = 5,
                       fig.height = 5,
                       error = TRUE,
+                      echo = TRUE,
                       cache = TRUE,
                       include = TRUE,
                       dev = "png",
@@ -59,7 +60,7 @@ knitr::opts_chunk$set(fig.width = 5,
                       message = TRUE)
 
 ## render on error hook
-knitr::knit_hooks$set(error = function(x) {
+knitr::knit_hooks$set(error = function(x, options) {
   knitr::knit_exit()
 })
 ```

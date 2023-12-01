@@ -6,3 +6,5 @@
 - update docs PNGs/DAGs
 - add QC stats reporting fastq number, filtered in at each step, etc
 - ~~fix the Dockerfile? if broken~~
+- the faSize conda installation problem
+- add back the wta multi altexp assay

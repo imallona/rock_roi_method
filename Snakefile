@@ -79,10 +79,10 @@ rule all:
     input:
         op.join(config['working_dir'], 'multimodal', 'descriptive_report.html'),
         expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
-               sample = get_sample_names())#,
-        # expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
-        #        modality = ['tso', 'wta'],
-        #        sample = get_sample_names())
+               sample = get_sample_names()),
+        expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
+               modality = ['tso', 'wta'],
+               sample = get_sample_names())
     
 rule index:
     conda:
@@ -638,12 +638,28 @@ checkpoint retrieve_genome_sizes:
         {params.faSize} -detailed -tab {input.fa} > {output}
         """
 
+rule index_bam:
+    conda:
+        "envs/all_in_one.yaml"
+    input:
+        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam')
+    output:
+        bai = op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                      'Aligned.sortedByCoord.out.bam.bai')
+    threads: workflow.cores
+    shell:
+        """
+        samtools index -@ {threads} {input.bam}     
+        """
+        
 ## by chrom
 rule split_by_chr:
     conda:
         "envs/all_in_one.yaml"
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+        bai = op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                      'Aligned.sortedByCoord.out.bam.bai'),
         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                  'filtered', 'barcodes.tsv')
     output:
@@ -651,11 +667,12 @@ rule split_by_chr:
                             '{chrom}_subset.bam'))
         # sorted = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
         #                     '{chrom}_cb_umi_sorted.bam'))
-    threads: 1
+    threads: max(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
     shell:
         """
         samtools view -h -b {input.bam} {wildcards.chrom} > {output.mini}      
         """
+
 ## by chrom
 rule dedup_by_cb_umi_gx:
     conda:
@@ -670,7 +687,7 @@ rule dedup_by_cb_umi_gx:
                             '{chrom}_cb_umi_deduped.bam')),
         header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
                             '{chrom}_cb_umi_deduped_header.txt'))
-    threads: 1
+    threads: max(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
     shell:
         """
         samtools view -H {input.mini} > {output.header}
@@ -720,6 +737,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         bedtools = config['bedtools'],
         bedGraphToBigWig = config['bedGraphToBigWig']        
     output:
+        cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')),
         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
         cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bw'))
     shell:
@@ -731,7 +749,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
 
         ## CB are the error-corrected barcodes
         samtools view -h -@ {threads} {input.bam} -D CB:{input.valid_barcodes} \
-           -o {output.cb_bam}
+           -o {output.cb_ub_bam}
         
         samtools index -@ {threads} {output.cb_ub_bam}
 
