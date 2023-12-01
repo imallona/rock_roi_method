@@ -9,8 +9,10 @@
 
 import os.path as op
 
+include: op.join('src', 'simulate.snmk')
+    
 configfile: "config.yaml"
-           
+
 if config['simulate']:
     config['gtf'] = op.join(config['working_dir'], 'data', 'genome.gtf')
     config['genome'] = op.join(config['working_dir'], 'data', 'genome.fa')
@@ -28,52 +30,13 @@ if config['simulate']:
     config['run_mode'] = 'all'
 
 
+
+
 ## to ease whitelists symlinking
 if not op.isabs(config['rock_method_path']):
     config['rock_method_path'] = op.join(workflow.basedir, config['rock_method_path'])
 
-def get_sample_names():
-    return([x['name'] for x in config['samples']])
-
-def get_cbumi_by_name(name):
-    for i in range(len(config['samples'])):
-        if config['samples'][i]['name'] == name:
-             return(config['samples'][i]['uses']['cb_umi_fq'])
-
-def get_cdna_by_name(name):
-    for i in range(len(config['samples'])):
-        if config['samples'][i]['name'] == name:
-             return(config['samples'][i]['uses']['cdna_fq'])
-
-def get_expected_cells_by_name(name):
-    for i in range(len(config['samples'])):
-        if config['samples'][i]['name'] == name:
-             return(config['samples'][i]['uses']['expected_cells'])
-
-def get_barcode_whitelist_by_name(name):
-    for i in range(len(config['samples'])):
-        if config['samples'][i]['name'] == name:
-             return(config['samples'][i]['uses']['whitelist'])
-
-def get_chromosomes(wildcards):
-    # with open(op.join(config['working_dir'], 'data', 'chrom.sizes')) as fh:
-    # with open(chromsizes_fn) as fh:
-    fn = checkpoints.retrieve_genome_sizes.get(**wildcards).output[0]
-    with open(fn) as fh:
-        return(list(line.strip().split('\t')[0] for line in fh))
-
-def list_by_chr_dedup_bams(wildcards):
-    chroms = get_chromosomes(wildcards)
-    return(chrom + '_cb_umi_deduped.bam' for chrom in chroms)
-
 print(get_sample_names())
-         
-## canonical CB 9-mers or just A{9}
-## (used for simulations)
-cb1s = ['GTCGCTATA','CTTGTACTA','CTTCACATA','ACACGCCGG','CGGTCCAGG','AATCGAATG','CCTAGTATA']
-cb2s = ['TACAGGATA','CACCAGGTA','TGTGAAGAA','GATTCATCA','CACCCAAAG','CACAAAGGC','GTGTGTCGA']
-cb3s = ['AAGCCTTCT','ATCATTCTG','CACAAGTAT','ACACCTTAG','GAACGACAA','AGTCTGTAC','AAATTACAG', 'AAAAAAAAA']
-umis = ['AACCTTGG', 'CCGGTTAA', 'TTGGCCAA', 'GACATAGG']
 
 rule all:
     input:
@@ -116,184 +79,6 @@ rule index:
      --genomeFastaFiles {input.fa} ) 2> {log}
         """
 
-rule simulate_genome:
-    output:
-        op.join(config['working_dir'], 'data', 'genome.fa')
-    shell:
-        """
-cat << EOF > {output}
->offtarget ERCC-00002
-TCCAGATTACTTCCATTTCCGCCCAAGCTGCTCACAGTATACGGGCGTCG
-GCATCCAGACCGTCGGCTGATCGTGGTTTTACTAGGCTAGACTAGCGTAC
-GAGCACTATGGTCAGTAATTCCTGGAGGAATAGGTACCAAGAAAAAAACG
-AACCTTTGGGTTCCAGAGCTGTACGGTCGCACTGAACTCGGATAGGTCTC
-AGAAAAACGAAATATAGGCTTACGGTAGGTCCGAATGGCACAAAGCTTGT
-TCCGTTAGCTGGCATAAGATTCCATGCCTAGATGTGATACACGTTTCTGG
-AAACTGCCTCGTCATGCGACTGTTCCCCGGGGTCAGGGCCGCTGGTATTT
-GCTGTAAAGAGGGGCGTTGAGTCCGTCCGACTTCACTGCCCCCTTTCAGC
-CTTTTGGGTCCTGTATCCCAATTCTCAGAGGTCCCGCCGTACGCTGAGGA
-CCACCTGAAACGGGCATCGTCGCTCTTCGTTGTTCGTCGACTTCTAGTGT
-GGAGACGAATTGCCAGAATTATTAACTGCGCAGTTAGGGCAGCGTCTGAG
-GAAGTTTGCTGCGGTTTCGCCTTGACCGCGGGAAGGAGACATAACGATAG
-CGACTCTGTCTCAGGGGATCTGCATATGTTTGCAGCATACTTTAGGTGGG
-CCTTGGCTTCCTTCCGCAGTCAAAACCGCGCAATTATCCCCGTCCTGATT
-TACTGGACTCGCAACGTGGGTCCATCAGTTGTCCGTATACCAAGACGTCT
-AAGGGCGGTGTACACCCTTTTGAGCAATGATTGCACAACCTGCGATCACC
-TTATACAGAATTATCAATCAAGCTCCCCGAGGAGCGGACTTGTAAGGACC
-GCCGCTTTCGCTCGGGTCTGCGGGTTATAGCTTTTCAGTCTCGACGGGCT
-AGCACACATCTGGTTGACTAGGCGCATAGTCGCCATTCACAGATTTGCTC
-GGCAATCAGTACTGGTAGGCGTTAGACCCCGTGACTCGTGGCTGAACGGC
-CGTACAACTCGACAGCCGGTGCTTGCGTTTTACCCTTAAAAAAAAAAAAA
-AAAAAAAAAAA
->ontarget ERCC-00003 dimer
-CAGCAGCGATTAAGGCAGAGGCGTTTGTATCTGCCATTATAAAGAAGTTT
-CCTCCAGCAACTCCTTTCTTAATTCCAAACTTAGCTTCAGTTATAAATTC
-CCCTCCCATGATTGGGATTTTATAAACTTTTCTTCCATATAATTCATCTT
-TCTTCTCATAACCGTCTCCGAAAAACTTCAACTTAAATCCAACCTTTAAC
-TGCTCATCAGCCATGTCTCCCACAGCATCAAAAATAGCAGTTGTTGGACA
-TGTTAAGACACACTGCCCCAATCTCTCTAACATTTGATGCTCTAACTCTG
-ACTTTTTAGGGTGGCATATCTGTATTATAAATCCTGGTCTTCCATCTGGT
-GTTTTTGATGGAGGGACATATTTCTCAATTCCTGCTTCTGCTGGACACAT
-TATAACTGAACAACCAAAACCTGTTGCCTCTGTAGCTGCAATCTTAGCCC
-ACTTCTTTGTAGCTGCTGTTATTAAAACTCTTGAAACCCATATTGGGAAT
-GCTTCTGCAAATGTATCTTCAATATATACTCCATTTATTTCCATAGTTTC
-CCTCCATTAAGATTTTAACAATTATAGTTTATCTTAGGGGCTATTAATAT
-CTTATCATTTGGTTTTTAATATTCGATAAATCCATAAATAAAAATATATC
-AACAATAATTTTAAATAATCTAAGTATAGGTAATATAACAATTAAAAAGA
-TTTAGAGGGATAGAATTGAACGGCATTAGGAGAATTGTTTTAGATATATT
-GAAGCCGCATGAGCCAAAAATAACAGATATGGCATTAAAATTAACATCAT
-TATCAAACATTGATGGGGTTAATATTACAGTCTATGAAATAGATAAAGAG
-ACTGAGAATGTTAAAGTTACAATTGAAGGGAATAATTTAGATTTTGATGA
-GATTCAGGAAATTATTGAAAGTTTGGGAGGGACTATTCACAGTATAGATG
-AGGTTGTTGCAGGTAAAAAGATTATTGAAGAGTTAGAACACCACAAGATA
-AAAAAAAAAAAAAAAAAAAAAAACAGCAGCGATTAAGGCAGAGGCGTTTGTATCTGCCATTATAAAGAAGTTT
-CCTCCAGCAACTCCTTTCTTAATTCCAAACTTAGCTTCAGTTATAAATTC
-CCCTCCCATGATTGGGATTTTATAAACTTTTCTTCCATATAATTCATCTT
-TCTTCTCATAACCGTCTCCGAAAAACTTCAACTTAAATCCAACCTTTAAC
-TGCTCATCAGCCATGTCTCCCACAGCATCAAAAATAGCAGTTGTTGGACA
-TGTTAAGACACACTGCCCCAATCTCTCTAACATTTGATGCTCTAACTCTG
-ACTTTTTAGGGTGGCATATCTGTATTATAAATCCTGGTCTTCCATCTGGT
-GTTTTTGATGGAGGGACATATTTCTCAATTCCTGCTTCTGCTGGACACAT
-TATAACTGAACAACCAAAACCTGTTGCCTCTGTAGCTGCAATCTTAGCCC
-ACTTCTTTGTAGCTGCTGTTATTAAAACTCTTGAAACCCATATTGGGAAT
-GCTTCTGCAAATGTATCTTCAATATATACTCCATTTATTTCCATAGTTTC
-CCTCCATTAAGATTTTAACAATTATAGTTTATCTTAGGGGCTATTAATAT
-CTTATCATTTGGTTTTTAATATTCGATAAATCCATAAATAAAAATATATC
-AACAATAATTTTAAATAATCTAAGTATAGGTAATATAACAATTAAAAAGA
-TTTAGAGGGATAGAATTGAACGGCATTAGGAGAATTGTTTTAGATATATT
-GAAGCCGCATGAGCCAAAAATAACAGATATGGCATTAAAATTAACATCAT
-TATCAAACATTGATGGGGTTAATATTACAGTCTATGAAATAGATAAAGAG
-ACTGAGAATGTTAAAGTTACAATTGAAGGGAATAATTTAGATTTTGATGA
-GATTCAGGAAATTATTGAAAGTTTGGGAGGGACTATTCACAGTATAGATG
-AGGTTGTTGCAGGTAAAAAGATTATTGAAGAGTTAGAACACCACAAGATA
-AAAAAAAAAAAAAAAAAAAAAAA
-EOF
-        """
-
-## notice the `captured` flag to focus on the last three GTF records during the custom featurecounting
-rule simulate_gtf:
-    output:
-        op.join(config['working_dir'], 'data', 'genome.gtf')
-    shell:
-        """
-echo -e 'offtarget\tERCC\texon\t1\t1061\t.\t+\t.\tgene_id "offtarget"; transcript_id "offtarget_1";
-ontarget\tcaptured\texon\t1\t1023\t.\t+\t.\tgene_id "ontarget_1"; transcript_id "ontarget_1";
-ontarget\tcaptured\texon\t100\t800\t.\t+\t.\tgene_id "ontarget_1b"; transcript_id "ontarget_1b";
-ontarget\tcaptured\texon\t1030\t1090\t.\t+\t.\tgene_id "ontarget_2"; transcript_id "ontarget_2";' > {output}
-        """
-
-rule simulate_fastqs:
-    conda:
-        "envs/all_in_one.yaml"
-    input:
-        part_r1 = expand(op.join(config['working_dir'], 'data', '{sample}',
-                                 'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz'),
-                         sample = get_sample_names(),
-                         cb1 = cb1s, cb2 = cb2s, cb3 = cb3s, umi = umis),
-        part_r2 = expand(op.join(config['working_dir'], 'data', '{sample}',
-                                 'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'),
-                         sample = get_sample_names(),
-                         cb1 = cb1s, cb2 = cb2s, cb3 = cb3s, umi = umis)
-    params:
-        path = op.join(config['working_dir'], 'data', '{sample}')
-    output:
-        r1 = op.join(config['working_dir'], 'data', '{sample}', 'r1.fq.gz'),
-        r2 = op.join(config['working_dir'], 'data', '{sample}', 'r2.fq.gz'),
-        r1_extra = temp(op.join(config['working_dir'], 'data', '{sample}', 'r1_extra.fq.gz')),
-        r2_extra = temp(op.join(config['working_dir'], 'data', '{sample}', 'r2_extra.fq.gz')),
-
-    shell:
-        """
-# cd {params.path}
-
-seq 1 100 | awk ' {{print "@extra"$0"\\nTACTGGACTCGCAACGTGGGTCCATCAGTTGTCCGTATACCAAGACGTCTAAGGGCGGTGTACACCCTTTTGAGCAATGATTGCACAACCTGCGATCACCTTATACAGAATTATCAATCAAGCTCCCCGAGGAGCGGACTTGTAAGGACCGCCGCTTTCGCTCGGGTCTGCGG\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c > {output.r1_extra}
-
-seq 1 100 | awk ' {{print "@extra"$0"\\nCTTGTACTAGTGATGTTCTCCAGACAGGCTACAGATTTGATGGTTTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c > {output.r2_extra}
-
-cat {input.part_r1} {output.r1_extra} > {output.r1}
-cat {input.part_r2} {output.r2_extra} > {output.r2}
-      """
-
-## notice we have a ~10x duplication rate (UMIs are reused multiple times)      
-rule simulate_fastqs_from_a_cell:
-    output:
-        part_r1 =  temp(op.join(config['working_dir'], 'data', '{sample}',
-                                'part_{cb1}_{cb2}_{cb3}_{umi}_r1.fq.gz')),
-        part_r2 =  temp(op.join(config['working_dir'], 'data', '{sample}',
-                                'part_{cb1}_{cb2}_{cb3}_{umi}_r2.fq.gz'))
-    params:
-        path = op.join(config['working_dir'], 'data', '{sample}'),
-        tso_fix1 = "AATG",
-        tso_fix2 = "CCAC",
-        wta_fix1 = "GTGA",
-        wta_fix2 = "GACA",
-    threads:
-        config['nthreads']
-    shell:
-        """
-mkdir -p {params.path}
-
-seq 1 10 | awk  '{{print "@wta"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nTACTGGACTCGCAACGTGGGTCCATCAGTTGTCCGTATACCAAGACGTCTAAGGGCGGTGTACACCCTTTTGAGCAATGATTGCACAACCTGCGATCACCTTATACAGAATTATCAATCAAGCTCCCCGAGGAGCGGACTTGTAAGGACCGCCGCTTTCGCTCGGGTCTGCGG\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c > {output.part_r1}
-
-seq 1 10 | awk ' {{print "@wta"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nA{wildcards.cb1}{params.wta_fix1}{wildcards.cb2}{params.wta_fix2}{wildcards.cb3}{wildcards.umi}AGATTTGATGGTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c > {output.part_r2}
-
-## similarly for region 1000-1100 for ontargets/tso
-
-seq 11 20 | awk ' {{print "@tso"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nATTATTGAAGAGTTAGAACACCACAAGATAAAAAAAAAAAAAAAAAAAAAAAACAGCAGCGATTAAGGCAGAGGCGTTTGTATCTGCCATTATAAAGAAGTTTCCTCCAGCAACTCCTTTCTTAATTCCAAACTTAGC\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r1}
-
-seq 11 20 | awk  ' {{print "@tso"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nT{wildcards.cb1}{params.tso_fix1}{wildcards.cb2}{params.tso_fix2}{wildcards.cb3}{wildcards.umi}TTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r2}
-
-## another ontarget region - TSO barcode
-## same UMI 100 times
-seq 21 30 | awk ' {{print "@tso"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nATTCCAAACTTAGCTTCAGTTATAAATTCCCCTCCCATGATTGGGATTTTATAAACTTTTCTTCCATATAATTCATCTTTCTTCTCATAACCGTCTCCGAAAAACTTCAACTTAAATCCAACCTTTAACTGCTCATCA\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r1}
-
-seq 21 30 | awk ' {{print "@tso"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nG{wildcards.cb1}{params.tso_fix1}{wildcards.cb2}{params.tso_fix2}{wildcards.cb3}{wildcards.umi}TTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r2}
-
-## let's add one read for ontargets on WTA
-
-seq 31 32 | awk ' {{print "@wta"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nATTCCAAACTTAGCTTCAGTTATAAATTCCCCTCCCATGATTGGGATTTTATAAACTTTTCTTCCATATAATTCATCTTTCTTCTCATAACCGTCTCCGAAAAACTTCAACTTAAATCCAACCTTTAACTGCTCATCA\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r1}
-
-seq 31 32 | awk ' {{print "@wta"$0"_{wildcards.cb1}_{wildcards.cb2}_{wildcards.cb3}__{wildcards.umi}\\nG{wildcards.cb1}{params.wta_fix1}{wildcards.cb2}{params.wta_fix2}{wildcards.cb3}{wildcards.umi}TTTTTTTTTTTTTTTT\\n+\\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";}}' | gzip -c >> {output.part_r2}
-      """
-
-## bd offers a couple of sets of whitelists, so we fetch the right one according to the config.yaml file
-def symlink_whitelist(sample):
-    os.makedirs(op.join(config['working_dir'], 'align_wta'), exist_ok = True)
-                
-    if get_barcode_whitelist_by_name(name = sample) == '96x3':
-        for x in ['BD_CLS1.txt', 'BD_CLS2.txt', 'BD_CLS3.txt']:
-            try:
-                os.symlink(src = op.join(config['rock_method_path'], 'data', 'whitelist_96x3', x),
-                           dst = op.join(config['working_dir'], 'align_wta', sample, 'whitelists', x))
-            except FileExistsError:
-                break
-    elif get_barcode_whitelist_by_name(name = sample) == '384x3':
-        for x in ['BD_CLS1.txt', 'BD_CLS2.txt', 'BD_CLS3.txt']:
-            try:
-                os.symlink(src = op.join(config['rock_method_path'], 'data', 'whitelist_384x3', x),
-                           dst = op.join(config['working_dir'], 'align_wta', sample, 'whitelists', x))
-            except FileExistsError:
-                break
 
 rule prepare_whitelists:
     # conda:
@@ -843,7 +628,7 @@ rule install_r_deps:
     conda:
         "envs/all_in_one.yaml"
     input:
-        script = op.join(config['rock_method_path'], 'installs.R')
+        script = op.join(config['rock_method_path'], 'src', 'installs.R')
     output:
         log = op.join(config['working_dir'], 'log', 'installs.log')
     params:
@@ -867,8 +652,9 @@ rule generate_sce:
         tso_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'tso_featurecounted'),
         wta_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'wta_featurecounted'),
         gtf = config['gtf'],
-        script = op.join(config['rock_method_path'], 'generate_sce_object.R'),
-        installs = op.join(config['working_dir'], 'log', 'installs.log')
+        script = op.join(config['rock_method_path'], 'src', 'generate_sce_object.R'),
+        installs = op.join(config['working_dir'], 'log', 'installs.log'),
+        subset_gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
     output:
         sce = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds')
     params:
@@ -889,7 +675,8 @@ rule generate_sce:
              -f {input.script} --args --sample {wildcards.sample} \
              --run_mode {params.run_mode} \
              --working_dir {params.working_dir} \
-             --output_fn {output.sce}
+             --output_fn {output.sce} \
+             --captured_gtf {input.subset_gtf}
         """
 
 
@@ -898,14 +685,14 @@ rule render_descriptive_report:
         "envs/all_in_one.yaml"
     input:
         gtf = config['gtf'],
-        script = op.join(config['rock_method_path'], 'process_sce_objects.Rmd'),
+        script = op.join(config['rock_method_path'], 'src', 'process_sce_objects.Rmd'),
         sces = expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
                sample = get_sample_names()),
         installs = op.join(config['working_dir'], 'log', 'installs.log')
     output:
         html = op.join(config['working_dir'], 'multimodal', 'descriptive_report.html'),
-        cache = temp(op.join(config['rock_method_path'], 'process_sce_objects_cache')),
-        cached_files = temp(op.join(config['rock_method_path'], 'process_sce_objects_files'))
+        # cache = temp(op.join(config['rock_method_path'], 'process_sce_objects_cache')),
+        # cached_files = temp(op.join(config['rock_method_path'], 'process_sce_objects_files'))
     log: op.join(config['working_dir'], 'multimodal', 'descriptive_report.log')
     params:
         multimodal_path = op.join(config['working_dir'], 'multimodal'),
@@ -921,14 +708,14 @@ rule render_descriptive_report:
         if [ "$simulate" = "False" ]
         then
 
-        {params.Rbin} -e 'rmarkdown::render(\"{input.script}\", 
+        {params.Rbin} --vanilla -e 'rmarkdown::render(\"{input.script}\", 
           output_file = \"{output.html}\", 
           params = list(multimodal_path = \"{params.multimodal_path}\", 
                         run_mode = \"{params.run_mode}\"))' &> {log}
         else
           echo "no report - that just just a simulation; but SCE objects are ready" > {output.html}
-          touch {output.cache}
-          touch {output.cached_files}
+          # touch [output.cache]          
+          # touch [output.cached_files]
         fi
 
         """

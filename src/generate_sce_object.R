@@ -29,7 +29,16 @@ parser$add_argument('--output_fn',
                     type = 'character',
                     help = 'Output SCE filename (path)')
 
+parser$add_argument('--captured_gtf', 
+                    type = 'character',
+                    help = 'Captured features GTF (path)')
+
 args <- parser$parse_args()
+
+get_captured_gene_ids <- function(gtf) {
+    fd <- read.table(gtf, sep = '\t')
+    return(sapply(strsplit(fd$V9, split = ';'), function(x) return(gsub('gene_id ', '', x[1]))))
+}
 
 read_matrix <- function(mtx, cells, features, cell.column = 1, feature.column = 1, modality, wta_whitelist) {
   cell.barcodes <- read.table(
@@ -95,6 +104,7 @@ read_featurecounts <- function(fn, wta_whitelist) {
 
 wd <- args$working_dir
 id <- args$sample
+gtf <- args$captured_gtf
 
 wta <- read_matrix(mtx = file.path(wd, 'align_wta', id,  'Solo.out', 'Gene', 'filtered', 'matrix.mtx'),
                    cells = file.path(wd, 'align_wta', id,  'Solo.out', 'Gene', 'filtered', 'barcodes.tsv'),
@@ -107,7 +117,11 @@ wta_feat <- read.table(file.path(wd, 'align_wta', id,  'Solo.out', 'Gene', 'filt
                        row.names = 1,
                        header = FALSE)
 
+captured <- get_captured_gene_ids(gtf)
+
 colnames(wta_feat) <- c("name", "type", "value")
+
+wta_feat$captured <- ifelse(wta_feat$name %in% captured, yes = 'captured', no = 'not_captured')
 
 ## wta end
 

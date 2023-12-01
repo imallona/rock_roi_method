@@ -4,5 +4,6 @@
 - clearly document the threads/cores/max pertask features
 - update docs PNGs/DAGs
 - add QC stats reporting fastq number, filtered in at each step, etc
-- the faSize conda installation problem
-
+- (urgent) fix the faSize conda installation problem
+- add proper logs
+- add proper benchmark/resource tracking
