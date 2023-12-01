@@ -61,8 +61,13 @@ knitr::opts_chunk$set(fig.width = 5,
 
 ## render on error hook
 knitr::knit_hooks$set(error = function(x, options) {
-  knitr::knit_exit()
+    ## if (exists(x)) {
+    ##     cat(str(x))
+    ## }
+
+    knitr::knit_exit()
 })
+  
 ```
 
 ```{r}
@@ -99,7 +104,7 @@ sce <- addPerCellQC(sce,
                     assay.type = 'wta',
                     subsets = list(mito = grep('^mt-', rownames(rowData(sce)),
                                                value = TRUE, ignore.case = TRUE),
-                                   capture = grep('ENSG|ENSMUSG', rownames(rowData(sce)), invert = TRUE)))
+                                   capture = rowData(sce)$captured == 'captured'))
 
 libsize.drop <- isOutlier(sce$total, nmads = 2, type = "both", log = TRUE, batch = sce$experiment)
 feature.drop <- isOutlier(sce$detected, nmads = 2, type = "both", log = TRUE, batch = sce$experiment)
@@ -396,11 +401,17 @@ tryCatch({
 ## Per cell and per feature QC {.tabset .tabset-pills}
 
 ```{r}
+## colData(sce) <-  colData(sce)[,'experiment']
+
+## most of the columns are WTA-based QC anyway
+colnames(colData(sce)) <- paste0('wta_', colnames(colData(sce)))
+colData(sce)$wta_experiment <- colData(sce)$experiment
+
 sce <- addPerCellQC(sce,
                     assay.type = 'tso_off_and_ontarget_unique',
                     subsets = list(mito = grep('^mt-', rownames(rowData(sce)),
                                                value = TRUE, ignore.case = TRUE),
-                                   capture = grep('ENSG|ENSMUSG', rownames(rowData(sce)), invert = TRUE)))
+                                   capture = rowData(sce)$captured == 'captured'))
 
 ```
 
@@ -614,8 +625,7 @@ FeaturePlot(object = so, reduction = "pca", features = 'subsets_mito_percent')+
     theme(legend.position="right", aspect.ratio = 1)
 cat('\n\n')
 
-
-captures <- grep('captured', colnames(so@meta.data))
+captures <- grep('captured', colnames(so@meta.data), value = TRUE)
 for (item in captures){
      tryCatch({   
         cat('#### ', item, ' \n\n')

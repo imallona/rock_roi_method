@@ -13,13 +13,6 @@ WORKDIR /home/rock
 COPY ./data data/
 COPY ./ .
 
-## (_not_ rockandroi python module) python installs along with snakemake (and _not_ deeptools)
-
-# RUN cd /home/rock/main/module && \
-#     # pip install -r rock_n_roi_requirements.txt && \
-#     mkdir -p data && \
-#     pip install snakemake pandas # deeptools
-
 RUN pip install snakemake pandas
 
 # STAR, subread and R packages installs

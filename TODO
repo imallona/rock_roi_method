@@ -1,10 +1,9 @@
 - (mark, high) coverage tracks: reduce the CB scope to filtered-in-after-proper-QC
 - (mark, high) add extra rowData to the SCEs using the GTF info
-- (izaskun, low) gather specs on whether adding an altExp of WTA with multimap-, multivoerlapping reads
 - (izaskun, high) add the expected cell number into the starsolo call
 - clearly document the threads/cores/max pertask features
 - update docs PNGs/DAGs
 - add QC stats reporting fastq number, filtered in at each step, etc
-- ~~fix the Dockerfile? if broken~~
-- the faSize conda installation problem
-- add back the wta multi altexp assay
+- (urgent) fix the faSize conda installation problem
+- add proper logs
+- add proper benchmark/resource tracking
