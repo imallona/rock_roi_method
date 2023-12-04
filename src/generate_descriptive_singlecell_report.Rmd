@@ -51,7 +51,7 @@ knitr::opts_chunk$set(fig.width = 5,
                       fig.height = 5,
                       error = TRUE,
                       echo = TRUE,
-                      cache = TRUE,
+                      cache = FALSE,
                       include = TRUE,
                       dev = "png",
                       dev.args = list(type = "cairo-png"),
@@ -59,14 +59,14 @@ knitr::opts_chunk$set(fig.width = 5,
                       warning = TRUE,
                       message = TRUE)
 
-## render on error hook
-knitr::knit_hooks$set(error = function(x, options) {
-    ## if (exists(x)) {
-    ##     cat(str(x))
-    ## }
+## ## render on error hook
+## knitr::knit_hooks$set(error = function(x, options) {
+##     ## if (exists(x)) {
+##     ##     cat(str(x))
+##     ## }
 
-    knitr::knit_exit()
-})
+##     knitr::knit_exit()
+## })
   
 ```
 
@@ -405,7 +405,7 @@ tryCatch({
 
 ## most of the columns are WTA-based QC anyway
 colnames(colData(sce)) <- paste0('wta_', colnames(colData(sce)))
-colData(sce)$wta_experiment <- colData(sce)$experiment
+colData(sce)$experiment <- colData(sce)$wta_experiment
 
 sce <- addPerCellQC(sce,
                     assay.type = 'tso_off_and_ontarget_unique',
@@ -629,8 +629,8 @@ captures <- grep('captured', colnames(so@meta.data), value = TRUE)
 for (item in captures){
      tryCatch({   
         cat('#### ', item, ' \n\n')
-        FeaturePlot(object = so, reduction = "pca", features = item)+
-            theme(legend.position="right", aspect.ratio = 1)
+        print(FeaturePlot(object = so, reduction = "pca", features = item)+
+            theme(legend.position="right", aspect.ratio = 1))
         cat('\n\n')
 }, error = function(x) print(x))
 }
@@ -675,8 +675,8 @@ for (item in captures){
 tryCatch({
     
     cat('#### ', item, ' \n\n')
-    FeaturePlot(object = so, reduction = "umap", features = item)+
-        theme(legend.position="right", aspect.ratio = 1)
+    print(FeaturePlot(object = so, reduction = "umap", features = item)+
+        theme(legend.position="right", aspect.ratio = 1))
     cat('\n\n')
     }, error = function(x) print(x))
 }
@@ -715,7 +715,7 @@ for (experiment in unique(colData(altExp(sce, 'tso_ontarget_multi'))$experiment)
     cat('### ', experiment, ' \n\n')
     
     idx <- colData(altExp(sce, 'tso_ontarget_multi'))$experiment == experiment
-    print(kable(apply(assay(altExp(sce[,idx], 'tso_ontarget_multi')),
+    print(knitr::kable(apply(assay(altExp(sce[,idx], 'tso_ontarget_multi')),
           1,
           function(x) sum(x > 0)/sum(idx) * 100)))
          

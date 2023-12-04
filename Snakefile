@@ -432,7 +432,7 @@ rule split_by_chr:
                             '{chrom}_subset.bam'))
         # sorted = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
         #                     '{chrom}_cb_umi_sorted.bam'))
-    threads: max(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
+    threads: min(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
     shell:
         """
         samtools view -h -b {input.bam} {wildcards.chrom} > {output.mini}      
@@ -452,7 +452,7 @@ rule dedup_by_cb_umi_gx:
                             '{chrom}_cb_umi_deduped.bam')),
         header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
                             '{chrom}_cb_umi_deduped_header.txt'))
-    threads: max(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
+    threads: min(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
     shell:
         """
         samtools view -H {input.mini} > {output.header}
@@ -502,7 +502,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         bedtools = config['bedtools'],
         bedGraphToBigWig = config['bedGraphToBigWig']        
     output:
-        cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt_twice.bam')),
+        cb_ub_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt_twice.bam'),
         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
         cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bw'))
     shell:
@@ -684,8 +684,9 @@ rule render_descriptive_report:
     conda:
         "envs/all_in_one.yaml"
     input:
+        mapping_report = op.join(config['working_dir'], 'multimodal', 'mapping_summary.txt'),
         gtf = config['gtf'],
-        script = op.join(config['rock_method_path'], 'src', 'process_sce_objects.Rmd'),
+        script = op.join(config['rock_method_path'], 'src', 'generate_descriptive_singlecell_report.Rmd'),
         sces = expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
                sample = get_sample_names()),
         installs = op.join(config['working_dir'], 'log', 'installs.log')
@@ -716,6 +717,37 @@ rule render_descriptive_report:
           echo "no report - that just just a simulation; but SCE objects are ready" > {output.html}
           # touch [output.cache]          
           # touch [output.cached_files]
+        fi
+
+        """
+
+rule generate_mapping_report:
+    conda:
+        "envs/all_in_one.yaml"
+    input:
+        gtf = config['gtf'],
+        script = op.join(config['rock_method_path'], 'src', 'generate_mapping_report.R'),
+        sces = expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
+                      sample = get_sample_names()),
+        installs = op.join(config['working_dir'], 'log', 'installs.log')
+    output:
+        summary = op.join(config['working_dir'], 'multimodal', 'mapping_summary.txt')
+    log: op.join(config['working_dir'], 'multimodal', 'mapping_report.log')
+    params:
+        path = config['working_dir'],
+        Rbin = config['Rbin'],
+        simulate = config['simulate']
+    shell:
+        """
+        simulate={params.simulate}
+
+        if [ "$simulate" = "False" ]
+        then
+
+        {params.Rbin} --no-echo --no-restore --file={input.script} \
+           --args --path {params.path} > {output.summary}
+        else
+            echo "no report - that just just a simulation; but SCE objects are ready" > {output.summary}
         fi
 
         """
