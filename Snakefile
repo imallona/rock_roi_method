@@ -20,12 +20,11 @@ if config['simulate']:
                           'uses': {
                               'cdna_fq': op.join(config['working_dir'], 'data', 'simulated', 'r1.fq.gz'),
                               'cb_umi_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
-                              'whitelist': '96x3',
-                              'expected_cells': 500}},
+                              'whitelist': '96x3'}},
                          {'name': 'simulated2', 'uses': {
                              'cdna_fq': op.join(config['working_dir'], 'data', 'simulated', 'r1.fq.gz'),
                              'cb_umi_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
-                             'whitelist': '96x3', 'expected_cells': 500}}]
+                             'whitelist': '96x3'}}]
     config['capture_gtf_column_2_pattern'] = 'captured'
     config['run_mode'] = 'all'
 
@@ -49,7 +48,7 @@ rule all:
     
 rule index:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         gtf = config['gtf'],
         fa = config['genome']
@@ -82,7 +81,7 @@ rule index:
 
 rule prepare_whitelists:
     # conda:
-    #     "envs/all_in_one.yaml"
+    #     op.join('envs', 'all_in_one.yaml')
     input:
         cbumi = lambda wildcards: get_cbumi_by_name(wildcards.sample),
         cdna = lambda wildcards: get_cdna_by_name(wildcards.sample)
@@ -99,7 +98,7 @@ rule prepare_whitelists:
 
 rule align_wta:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         # r1 = op.join(config['working_dir'], 'data', "{sample}", 'r1.fq.gz'),
         # r2 = op.join(config['working_dir'], 'data', "{sample}", 'r2.fq.gz'),
@@ -159,7 +158,7 @@ rule align_wta:
         
 rule generate_tso_whitelist_from_wta_filtered:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
                                     'filtered', 'barcodes.tsv')
@@ -179,17 +178,12 @@ rule generate_tso_whitelist_from_wta_filtered:
         
 rule align_tso:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         cdna = lambda wildcards: get_cdna_by_name(wildcards.sample),
         cbumi = lambda wildcards: get_cbumi_by_name(wildcards.sample),
         index_flag = op.join(config['working_dir'] , 'data', 'index', 'SAindex'),
         gtf = config['gtf'],
-        # filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
-        #                             'filtered', 'barcodes.tsv'),
-        # cb1 = op.join(config['working_dir'], 'align_wta', "{sample}",  'whitelists', 'BD_CLS1.txt'),
-        # cb2 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS2.txt'),
-        # cb3 = op.join(config['working_dir'], 'align_wta', "{sample}", 'whitelists', 'BD_CLS3.txt')
         cb1 = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist_1.txt'),
         cb2 = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist_2.txt'),
         cb3 = op.join(config['working_dir'], 'data', '{sample}', 'tso_whitelist_3.txt')
@@ -247,7 +241,7 @@ rule align_tso:
 ## @todo filter the coordinates, not only the chromosomes
 rule subset_chromosomes_for_custom_counting:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')
     output:
@@ -260,17 +254,6 @@ rule subset_chromosomes_for_custom_counting:
         pattern = config['capture_gtf_column_2_pattern'],
         temp_red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}',
                                'tmp_subset_{modality}.bam')
-    # run:
-    #     if params.run_mode in ['all', 'tso ontarget multi']:
-    #         shell ("""
-    #         grep {params.pattern} {params.gtf} | cut -f1 | sort | uniq  > {output.chrs}
-    #         captured=$(cat {output.chrs} | tr '\\n' ' ')
-
-    #         samtools index -@ {threads} {input.bam}
-
-    #         samtools view -h {input.bam}  $captured -@ {threads} | \
-    #             samtools view -Sb > {output.red_bam}
-    #         """)
     shell:
         """
         run_mode={params.run_mode}
@@ -289,7 +272,7 @@ rule subset_chromosomes_for_custom_counting:
 
 rule subset_gtf_for_custom_counting:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         gtf = config['gtf']
     output:
@@ -304,7 +287,7 @@ rule subset_gtf_for_custom_counting:
 
 rule add_readgroups_to_bam:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         without_rgs = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam'),
         filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
@@ -347,7 +330,7 @@ rule add_readgroups_to_bam:
 
 rule count_custom_regions_no_module:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}_rg.bam'),
         gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
@@ -391,7 +374,7 @@ rule count_custom_regions_no_module:
         
 checkpoint retrieve_genome_sizes:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         fa = config['genome']
     params:
@@ -405,7 +388,7 @@ checkpoint retrieve_genome_sizes:
 
 rule index_bam:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam')
     output:
@@ -420,7 +403,7 @@ rule index_bam:
 ## by chrom
 rule split_by_chr:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         bai = op.join(config['working_dir'], 'align_{modality}', '{sample}',
@@ -430,8 +413,6 @@ rule split_by_chr:
     output:
         mini = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
                             '{chrom}_subset.bam'))
-        # sorted = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-        #                     '{chrom}_cb_umi_sorted.bam'))
     threads: min(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
     shell:
         """
@@ -441,9 +422,8 @@ rule split_by_chr:
 ## by chrom
 rule dedup_by_cb_umi_gx:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
-        # bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         mini = op.join(config['working_dir'], 'align_{modality}', '{sample}',
                             '{chrom}_subset.bam'),
         chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
@@ -468,10 +448,8 @@ rule dedup_by_cb_umi_gx:
 
 rule merge_deduped_bams:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
-        # chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes'),
-        # bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
         bams = lambda wildcards: [op.join(config['working_dir'], 'align_{modality}', '{sample}', x) for x in list_by_chr_dedup_bams(wildcards)]
     output:
         unsorted = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
@@ -488,7 +466,7 @@ rule merge_deduped_bams:
 
 rule create_deduped_coverage_tracks_all_filtered_in_cbs:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam'),
         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
@@ -497,7 +475,6 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
     threads:
         config['nthreads']
     params:
-        # bamCoverage = config['bamCoverage'],
         binSize = 10,
         bedtools = config['bedtools'],
         bedGraphToBigWig = config['bedGraphToBigWig']        
@@ -528,7 +505,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
         
 # rule create_deduped_coverage_tracks_all_filtered_in_cbs:
 #     conda:
-#         "envs/all_in_one.yaml"
+#         op.join('envs', 'all_in_one.yaml')
 #     input:
 #         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
 #         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
@@ -580,7 +557,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
 
 # rule create_deduped_coverage_tracks_single_cb:
 #     conda:
-#        "envs/all_in_one.yaml"
+#        op.join('envs', 'all_in_one.yaml')
 #    input:
 #         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
 #         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
@@ -626,7 +603,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
 ## R_LIBS are conda's if run in conda, but /home/rock/R_LIBs if run in docker, and user's if run directly
 rule install_r_deps:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         script = op.join(config['rock_method_path'], 'src', 'installs.R')
     output:
@@ -647,7 +624,7 @@ rule install_r_deps:
         
 rule generate_sce:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         tso_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'tso_featurecounted'),
         wta_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'wta_featurecounted'),
@@ -682,7 +659,7 @@ rule generate_sce:
 
 rule render_descriptive_report:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         mapping_report = op.join(config['working_dir'], 'multimodal', 'mapping_summary.txt'),
         gtf = config['gtf'],
@@ -723,7 +700,7 @@ rule render_descriptive_report:
 
 rule generate_mapping_report:
     conda:
-        "envs/all_in_one.yaml"
+        op.join('envs', 'all_in_one.yaml')
     input:
         gtf = config['gtf'],
         script = op.join(config['rock_method_path'], 'src', 'generate_mapping_report.R'),

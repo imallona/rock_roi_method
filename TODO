@@ -1,9 +1,7 @@
 - (mark, high) coverage tracks: reduce the CB scope to filtered-in-after-proper-QC
 - (mark, high) add extra rowData to the SCEs using the GTF info
-- (izaskun, high) add the expected cell number into the starsolo call
+- (izaskun, moderate) add the expected cell number into the starsolo call
 - clearly document the threads/cores/max pertask features
 - update docs PNGs/DAGs
-- add QC stats reporting fastq number, filtered in at each step, etc
-- (urgent) fix the faSize conda installation problem
-- add proper logs
+- consolidate all logs in a log/ folder
 - add proper benchmark/resource tracking
