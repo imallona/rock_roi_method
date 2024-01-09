@@ -419,8 +419,34 @@ rule split_by_chr:
         samtools view -h -b {input.bam} {wildcards.chrom} > {output.mini}      
         """
 
-## by chrom
-rule dedup_by_cb_umi_gx:
+# ## by chrom
+# rule dedup_by_cb_umi_gx:
+#     conda:
+#         op.join('envs', 'all_in_one.yaml')
+#     input:
+#         mini = op.join(config['working_dir'], 'align_{modality}', '{sample}',
+#                             '{chrom}_subset.bam'),
+#         chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
+#     output:
+#         cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+#                             '{chrom}_cb_umi_deduped.bam')),
+#         header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+#                             '{chrom}_cb_umi_deduped_header.txt'))
+#     threads: min(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
+#     shell:
+#         """
+#         samtools view -H {input.mini} > {output.header}
+
+#         # 20 gx (gene id)
+#         # 27 CB (error corrected CB)
+#         # 28 UB (error corrected UMI)
+#         # the chromosome is implicit - from the per-chr run
+#         samtools view [input.mini] |  sort -k27 -k28 -k 20 -u | cat [output.header] - | \
+#            samtools view -Sbh > [output.cb_ub_bam]  
+
+#         """
+
+rule dedup_by_cb_umi_and_gx_and_start:
     conda:
         op.join('envs', 'all_in_one.yaml')
     input:
@@ -437,11 +463,12 @@ rule dedup_by_cb_umi_gx:
         """
         samtools view -H {input.mini} > {output.header}
 
+        # 4 start (SAM POS) needed to avoid losing the second monomer in tdtomato (warning dirty CB/UMI dedup!)
         # 20 gx (gene id)
         # 27 CB (error corrected CB)
         # 28 UB (error corrected UMI)
         # the chromosome is implicit - from the per-chr run
-        samtools view {input.mini} |  sort -k27 -k28 -k 20 -u | cat {output.header} - | \
+        samtools view {input.mini} |  sort -k4 -k27 -k28 -k20 -u | cat {output.header} - | \
            samtools view -Sbh > {output.cb_ub_bam}  
 
         """
