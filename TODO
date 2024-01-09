@@ -1,7 +1,4 @@
 - (mark, high) coverage tracks: reduce the CB scope to filtered-in-after-proper-QC
-- (mark, high) add extra rowData to the SCEs using the GTF info
 - (izaskun, moderate) add the expected cell number into the starsolo call
 - clearly document the threads/cores/max pertask features
-- update docs PNGs/DAGs
-- consolidate all logs in a log/ folder
 - add proper benchmark/resource tracking

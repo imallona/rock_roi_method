@@ -61,7 +61,8 @@ rule index:
         processing_path = op.join(config['working_dir'], 'data'),
         nthreads = config['nthreads'],
         star = config['STAR'],
-        sjdbOverhang = config['sjdbOverhang']
+        sjdbOverhang = config['sjdbOverhang'],
+        indexNbases = 4 if config['simulate'] else 14
     log:
         op.join(config['working_dir'], 'data', 'indexing.log')
     shell:
@@ -73,7 +74,7 @@ rule index:
      --runMode genomeGenerate \
      --sjdbGTFfile {input.gtf} \
      --genomeDir {params.processing_path}/index \
-     --genomeSAindexNbases 4 \
+     --genomeSAindexNbases {params.indexNbases} \
      --sjdbOverhang {params.sjdbOverhang} \
      --genomeFastaFiles {input.fa} ) 2> {log}
         """
