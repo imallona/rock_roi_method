@@ -245,7 +245,7 @@ rule subset_chromosomes_for_custom_counting:
     input:
         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')
     output:
-        red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam'),
+        red_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam')),
         chrs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'captured_chrs.txt'))        
     threads: 10        
     params:
@@ -481,7 +481,7 @@ rule merge_deduped_bams:
     output:
         unsorted = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
                                 'cb_ub_filt_unsorted.bam')),
-        merged = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')
+        merged = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam'))
     threads:
         config['nthreads']
     shell:
@@ -508,7 +508,7 @@ rule create_deduped_coverage_tracks_all_filtered_in_cbs:
     output:
         cb_ub_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt_twice.bam'),
         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
-        cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bw'))
+        cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt_twice.bw'))
     shell:
         """
         ## this is unrelated to the bamgeneration; fixes starsolo's default permissions
