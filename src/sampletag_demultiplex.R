@@ -1,6 +1,6 @@
 #!/usr/bin/env R
 ##
-## Assigns sampletags to CBs in a BD-compliant way. Untested using real data.
+## Assigns sampletags to CBs in a BD-compliant way. Untested using real data. Not part of the Snakefile.
 ##
 ## 09th Jan 2024
 ## Izaskun Mallona
@@ -26,32 +26,43 @@ fd <- cbind(fd, t(data.frame(st1 = rbinom(10, 10, 0.4),
 
 colnames(fd) <- paste0('cb', 1:30)
 
-fd
-
 ## "A high quality singlet is a putative cell where more than 75% of Sample Tag reads are from a single tag"
-
-demux <- data.frame(cb = colnames(fd))
+## demux <- data.frame(cb = colnames(fd))
 
 ## "When a singlet is identified, the counts for all the other tags are considered Sample Tag noise."
 
-foo <- t(apply(fd, 2, function(x) {
-    tmp <- proportions(x)[proportions(x) >= 0.75]
-    sts <- names(tmp)
-    counts <- as.numeric(x[sts][1])
-    if (length(sts) == 0) {
-        sts <- NA
-        counts <- 0
+## foo <- t(apply(fd, 2, function(x) {
+##     tmp <- proportions(x)[proportions(x) >= 0.75]
+##     sts <- names(tmp)
+##     counts <- as.numeric(x[sts][1])
+##     if (length(sts) == 0) {
+##         sts <- NA
+##         counts <- 0
+##     }
+##     return(c(sts, counts))
+## }))
+
+demux <- data.frame(cb = colnames(fd), st = NA, highqual_counts = 0, total_counts = 0, noise = 0, status = NA)
+rownames(demux) <- demux$cb
+
+for (i in 1:ncol(fd)) {
+    cell <- colnames(fd)[i]
+    tmp <- as.data.frame(proportions(fd[,cell]))
+    rownames(tmp) <- rownames(fd)
+    tmp$highqual <- tmp[,1] >= 0.75
+    tmp$counts <- fd[,cell]
+
+    if (any(tmp$highqual)) {
+        demux[cell, 'st'] <- rownames(tmp)[tmp$highqual]
+        demux[cell, 'highqual_counts'] <- tmp$counts[tmp$highqual]
     }
-    return(c(sts, counts))
-}))
 
+    demux[cell, 'total_counts']  <-  sum(fd[,cell])
+}
 
-demux$st <- foo[,1]
-demux$highqual_counts <- as.numeric(foo[,2])
-demux$total_counts <- colSums(fd)
-demux$noise <- colSums(fd) - demux$highqual_counts
+demux$noise <- demux$total_counts - demux$highqual_counts
 demux$status <- ifelse(!is.na(demux$st), 'highqual', 'undetermined')
-
+demux$noise[demux$status == 'undetermined'] <- 0 ## no way of calculating noise for those
 ## "The minimum Sample Tag read count for a putative cell to be positively identified with a
 ##  Sample Tag is defined
 ##  as the lowest read count of a high quality singlet for that Sample Tag"
@@ -65,7 +76,10 @@ for (st in rownames(fd)) {
 }
 
 for (st in names(thres)) {
-    demux[,st] <- ifelse(fd[st, ] >= thres[[st]], yes = fd[st,], no = NA)
+    demux[,st] <- sapply(fd[st,], function(x) {
+        if ((x) >= thres[[st]]) return(x)
+        else return(NA)
+    })    
 }
 
 ## "
@@ -86,8 +100,11 @@ for (st in names(thres)) {
 (tags_noise <- data.frame(aggregate(demux$noise, list(st = demux$st), function(x) sum(x)/sum(demux$noise)),
                           row.names = 1))
 
-plot(demux$highqual_counts, demux$noise)
-(m <- lm(demux$noise ~ demux$total_counts))
+plot(demux$total_counts, demux$noise, pch = 19, cex = 0.3)
+
+(m <- lm(demux$noise ~ 0 + demux$total_counts))
+
+abline(m, col = 'red', lwd = 2)
 
 ## let's hope the slope is positive!
 stopifnot(m$coefficients[2] > 0)
@@ -116,4 +133,15 @@ table(demux$status)
 ## clean a bit
 demux <- demux[,c('cb', 'st', 'status', 'called_st')]
 
-demux
+table(demux$status, demux$called_st)
+
+## real data
+if (FALSE) {
+    se <- readRDS('/home/imallona/sampletags_summarizedexperiment.rds')
+    fd<- assay(se)        
+    ## no sampletags, no party
+    fd <- fd[ c('human_sampletag_10', 'human_sampletag_11'), ]
+    fd <- fd[,colSums(fd) > 20]
+    dim(fd)
+    fd <- as.data.frame(as.matrix(fd))
+}
