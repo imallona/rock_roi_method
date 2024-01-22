@@ -367,6 +367,7 @@ rule count_custom_regions_no_module:
                  -f \
                  -O \
                  -M  \
+                 -J \
                  -T {threads} \
                  --fraction \
                  --byReadGroup &> {log}
