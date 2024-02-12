@@ -367,7 +367,6 @@ rule count_custom_regions_no_module:
                  -f \
                  -O \
                  -M  \
-                 -J \
                  -T {threads} \
                  --fraction \
                  --byReadGroup &> {log}
@@ -664,6 +663,7 @@ rule generate_sce:
     output:
         sce = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds')
     params:
+        multimodal_path = op.join(config['working_dir'], 'multimodal'),
         run_mode = config['run_mode'],
         working_dir = config['working_dir'],
         sample = "{wildcards.sample}",
@@ -677,6 +677,7 @@ rule generate_sce:
     #         shell(" echo 'something else' > {output.sce}")
     shell:
         """
+        mkdir -p {params.multimodal_path} 
         {params.Rbin} -q --no-save --no-restore --slave \
              -f {input.script} --args --sample {wildcards.sample} \
              --run_mode {params.run_mode} \
