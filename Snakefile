@@ -459,18 +459,37 @@ rule dedup_by_cb_umi_and_gx_and_start:
                             '{chrom}_cb_umi_deduped.bam')),
         header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
                             '{chrom}_cb_umi_deduped_header.txt'))
-    threads: min(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
+    threads: min(10, int(-(-workflow.cores * 0.1 // 1))) # workaround to reduce IO bottleneck (uses `ceil`)
     shell:
         """
         samtools view -H {input.mini} > {output.header}
 
+        ## this breaks because of the interleaved tags
         # 4 start (SAM POS) needed to avoid losing the second monomer in tdtomato (warning dirty CB/UMI dedup!)
         # 20 gx (gene id)
         # 27 CB (error corrected CB)
         # 28 UB (error corrected UMI)
         # the chromosome is implicit - from the per-chr run
-        samtools view {input.mini} |  sort -k4 -k27 -k28 -k20 -u | cat {output.header} - | \
-           samtools view -Sbh > {output.cb_ub_bam}  
+        # samtools view {input.mini} |  sort -k4 -k27 -k28 -k20 -u | cat {output.header} - | \
+        #    samtools view -Sbh > {output.cb_ub_bam}  
+
+        ## this is a rather dirty fix to reorder SAM TAGs (by position) so the sort -u works as expected
+        # 4 start (SAM POS) needed to avoid losing the second monomer in tdtomato (warning dirty CB/UMI dedup!)
+        # 20 gx (gene id)
+        # 27 CB (error corrected CB)
+        # 28 UB (error corrected UMI)
+        # the chromosome is implicit - from the per-chr run
+        samtools view -@ {threads} {input.mini} | \
+               ##  yes POS ($4) is repeated, and it's unorthodox to have it somewhere not in 4
+               awk 'OFS=FS="\t" {{print $1,  $2,  $3,  $4,   $5,  $6,  $7,  $8,  $9,  $10, 
+                                       $11, $12, $13, $14, $15, $16, $17, $18, $19, 
+                                       $21, $22, $23, $24, $25, $26, 
+                                       $28, $27, $20, $4}}' | \
+               sort -k26 -k27 -k28 -k29 -u | \
+               ## so it's removed after the sorting
+               cut -f1-28 | \
+               cat {output.header} - | \
+               samtools view -@ {threads} -Sbh > {output.cb_ub_bam} 
 
         """
 
