@@ -481,10 +481,10 @@ rule dedup_by_cb_umi_and_gx_and_start:
         # the chromosome is implicit - from the per-chr run
         samtools view -@ {threads} {input.mini} | \
                ##  yes POS ($4) is repeated, and it's unorthodox to have it somewhere not in 4
-               awk 'OFS=FS="\t" {{print $1,  $2,  $3,  $4,   $5,  $6,  $7,  $8,  $9,  $10, 
-                                       $11, $12, $13, $14, $15, $16, $17, $18, $19, 
-                                       $21, $22, $23, $24, $25, $26, 
-                                       $28, $27, $20, $4}}' | \
+               awk 'OFS=FS="\\t" {{print $1,  $2,  $3,  $4,  $5,  $6,  $7,  $8,  $9,  $10, 
+                                         $11, $12, $13, $14, $15, $16, $17, $18, $19, 
+                                         $21, $22, $23, $24, $25, $26, 
+                                         $28, $27, $20, $4}}' | \
                sort -k26 -k27 -k28 -k29 -u | \
                ## so it's removed after the sorting
                cut -f1-28 | \
