@@ -236,7 +236,7 @@ The 96x3 list is a subset of the 384x3 list. You can browse these allowedlists a
 
 To subset the GTF features to count during the custom TSO counting process:
 
-1. Write the starting GTF (`config['gtf']`) so it contains an indentifier in column2, i.e. you could flag the features that are being 'rock'-ed or 'roi'-ed with a searchable `source` (https://www.ensembl.org/info/website/upload/gff.html)[GTF column 2]. 
+1. Write the starting GTF (`config['gtf']`) so it contains an indentifier in column2, i.e. you could flag the features that are being 'rock'-ed or 'roi'-ed with a searchable `source` [GTF column 2](https://www.ensembl.org/info/website/upload/gff.html). 
 
 For instance, with `captured` in column2.
 

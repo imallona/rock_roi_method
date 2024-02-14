@@ -277,7 +277,7 @@ rule subset_gtf_for_custom_counting:
     input:
         gtf = config['gtf']
     output:
-        subset_gtf = temp(op.join(config['working_dir'], 'multimodal', 'subset.gtf'))
+        subset_gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
     threads: 10
     params:
         pattern = config['capture_gtf_column_2_pattern']
