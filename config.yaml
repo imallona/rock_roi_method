@@ -27,6 +27,7 @@ working_dir: work
 gtf: work/data/genome.gtf
 genome: work/data/genome.fa
 
+# i.e. cDNA read length minus 1
 sjdbOverhang: 100
 
 ## run mode, one of these (please see the README / docs):

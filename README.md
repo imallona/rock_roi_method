@@ -4,6 +4,8 @@ This repository belongs to the rock and roi project from the University of Zuric
 
 This repository includes a Snakemake workflow to automate data processing from raw reads to count tables (and R `singleCellExperiment` objects) listing both on-target TSO and off-target WTA readouts. The software stack needed to run the method is containerized using Docker.
 
+If you are planning to analyze BD Rhapsody data without RoCK nor RoCK+ROI, that is, just WTA plus sample tags, you might want to check https://github.com/imallona/rhapsodist (under development) instead.
+
 # Components
 
 To analyze their data, users need to provide their sequencing files in fastq format (one for the cell barcode plus UMI; and another for the cDNA) and a configuration file specifying the experiment characteristics and extra information, including:
@@ -18,7 +20,7 @@ To analyze their data, users need to provide their sequencing files in fastq for
 
 The workflow follows these steps:
 
-1. Index the reference genome with STAR.
+1. Index the reference genome with STAR. Please finetune the `sjdbOverhang` (`config.yaml`) accordingly (i.e. cDNA length - 1). 
 2. Subset reads matching the WTA cell barcodes and map those to the transcriptome (genome plus GTF) using STARsolo. Detected cell barcodes (cells) are filtered in at two levels: first, by matching to the user-provided cell barcode whitelist; and second, by applying the EmptyDrops algorithm to discard empty droplets. We report two outputs from this step: the filtered-in cells according to the aforementioned filters; and the unbiased, whole-transcriptome WTA count table
 3. Subset reads matching both the TSO CB structure and the filtered in cell barcodes and map those to the transcriptome. Our reasoning is that the expected TSO transcriptional complexity is undefined and not usable to tell apart cells from empty droplets, so we borrow the filtered-in cells from the EmptyDrops results from the WTA analysis.
 4. (optional) Count on-target features in a more lenient way, filtering in multioverlapping and multimapping reads. This run mode is recommended when the captured regions target non unique loci (i.e. repetitive sequences).
