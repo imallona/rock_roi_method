@@ -9,6 +9,8 @@
 
 include: "workflow_functions.py"
 
+configfile: "config.yaml"
+
 ## canonical CB 9-mers or just A{9}
 ## (used for simulations)
 cb1s = ['GTCGCTATA','CTTGTACTA','CTTCACATA','ACACGCCGG','CGGTCCAGG','AATCGAATG','CCTAGTATA']
