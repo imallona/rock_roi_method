@@ -125,7 +125,7 @@ wta_feat$captured <- ifelse(wta_feat$name %in% captured, yes = 'captured', no = 
 
 ## wta end
 
-if (args$run_mode == 'tso_ontarget_multi') {
+if (args$run_mode == 'tso ontarget multi') {
     mtso <- read_featurecounts(file.path(wd, 'multimodal', id, 'tso_featurecounted'),
                                wta_whitelist = colnames(wta))
     mwta <- read_featurecounts(file.path(wd, 'multimodal', id, 'wta_featurecounted'),

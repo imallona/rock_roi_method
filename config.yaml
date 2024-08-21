@@ -32,9 +32,9 @@ sjdbOverhang: 100
 
 ## run mode, one of these (please see the README / docs):
 ##   'tso off- and ontarget unique'
-##   'tso ontarget multi'
+##   'tso ontarget_multi'
 ##   'all'
-run_mode: 'all'
+run_mode: 'tso ontarget multi'
 
 ## GTF `source` field identifying on-target rock- or roi- features
 capture_gtf_column_2_pattern : 'captured'
