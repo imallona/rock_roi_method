@@ -26,7 +26,7 @@ if config['simulate']:
                              'cb_umi_fq': op.join(config['working_dir'], 'data', 'simulated', 'r2.fq.gz'),
                              'whitelist': '96x3'}}]
     config['capture_gtf_column_2_pattern'] = 'captured'
-    config['run_mode'] = 'all'
+    # config['run_mode'] = 'all'
 
 
 
@@ -42,9 +42,9 @@ rule all:
         op.join(config['working_dir'], 'multimodal', 'descriptive_report.html'),
         expand(op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds'),
                sample = get_sample_names()),
-        expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
-               modality = ['tso', 'wta'],
-               sample = get_sample_names())
+        # expand(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
+        #        modality = ['tso', 'wta'],
+        #        sample = get_sample_names())
     
 rule index:
     conda:
@@ -237,41 +237,8 @@ rule align_tso:
         rm -rf {params.tmp}
         """
 
-        
-## this is a dirty workaround to reduce mem usage by selecting which chromosomes have 'captured' features
-## @todo filter the coordinates, not only the chromosomes
-rule subset_chromosomes_for_custom_counting:
-    conda:
-        op.join('envs', 'all_in_one.yaml')
-    input:
-        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')
-    output:
-        red_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam')),
-        chrs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'captured_chrs.txt'))        
-    threads: 10        
-    params:
-        gtf = config['gtf'],
-        run_mode = config['run_mode'],
-        pattern = config['capture_gtf_column_2_pattern'],
-        temp_red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}',
-                               'tmp_subset_{modality}.bam')
-    shell:
-        """
-        run_mode={params.run_mode}
-
-        if [ "$run_mode" = "all" ] || [ "$run_mode" = "tso_ontarget_multi" ]
-        then
-            grep {params.pattern} {params.gtf} | cut -f1 | sort | uniq  > {output.chrs}
-            captured=$(cat {output.chrs} | tr '\\n' ' ')
-
-            samtools index -@ {threads} {input.bam}
-
-            samtools view -h {input.bam}  $captured -@ {threads} | \
-                samtools view -Sb > {output.red_bam}
-        fi
-        """
-
-rule subset_gtf_for_custom_counting:
+rule:
+    name: 'subset_gtf_for_custom_counting'
     conda:
         op.join('envs', 'all_in_one.yaml')
     input:
@@ -282,32 +249,70 @@ rule subset_gtf_for_custom_counting:
     params:
         pattern = config['capture_gtf_column_2_pattern']
     shell:
-        """
-        grep {params.pattern} {input.gtf} > {output.subset_gtf}
-        """
+       """
+       grep {params.pattern} {input.gtf} > {output.subset_gtf}
+       """
+        
+if config['run_mode'] in ['all', 'tso ontarget multi']:
+    rule:
+        ## this is a dirty workaround to reduce mem usage by selecting which chromosomes have 'captured' features
+        ## @todo filter the coordinates, not only the chromosomes
+        name:
+           'subset_chromosomes_for_custom_counting'
+        conda:
+            op.join('envs', 'all_in_one.yaml')
+        input:
+            bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')
+        output:
+            red_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam')),
+            chrs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'captured_chrs.txt'))        
+        threads: 10        
+        params:
+            gtf = config['gtf'],
+            run_mode = config['run_mode'],
+            pattern = config['capture_gtf_column_2_pattern'],
+            temp_red_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                   'tmp_subset_{modality}.bam')
+        shell:
+            """
+        run_mode="{params.run_mode}"
 
-rule add_readgroups_to_bam:
-    conda:
-        op.join('envs', 'all_in_one.yaml')
-    input:
-        without_rgs = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam'),
-        filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
-                                    'filtered', 'barcodes.tsv')
-    output:
-        header = temp(op.join(config['working_dir'], 'align_{modality}',
-                                       '{sample}', 'header')),
-        header_barcodes = temp(op.join(config['working_dir'], 'align_{modality}',
-                                       '{sample}', 'header_rgs')),
-        with_rgs_no_header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-                                          'subset_{modality}_rg_no_header.bam')),
-        with_rgs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-                                'subset_{modality}_rg.bam'))
-    threads: config['nthreads']
-    shell:
-        """
+        if [ "$run_mode" = "all" ] || [ "$run_mode" = "tso ontarget multi" ]
+        then
+           grep {params.pattern} {params.gtf} | cut -f1 | sort | uniq  > {output.chrs}
+           captured=$(cat {output.chrs} | tr '\\n' ' ')
+
+           samtools index -@ {threads} {input.bam}
+
+           samtools view -h {input.bam}  $captured -@ {threads} | \
+           samtools view -Sb > {output.red_bam}
+        fi
+            """
+
+    rule:
+        name:
+            'add_readgroups_to_bam'
+        conda:
+            op.join('envs', 'all_in_one.yaml')
+        input:
+            without_rgs = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}.bam'),
+            filtered_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+                                        'filtered', 'barcodes.tsv')
+        output:
+            header = temp(op.join(config['working_dir'], 'align_{modality}',
+                                  '{sample}', 'header')),
+            header_barcodes = temp(op.join(config['working_dir'], 'align_{modality}',
+                                           '{sample}', 'header_rgs')),
+            with_rgs_no_header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                              'subset_{modality}_rg_no_header.bam')),
+            with_rgs = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                    'subset_{modality}_rg.bam'))
+        threads: config['nthreads']
+        shell:
+            """
         ## replace the CBs by RGs
         samtools view -h {input.without_rgs} -@ {threads} | \
-             sed 's/CB:Z:/RG:Z:tso_/g' | samtools view -h -Sb >  {output.with_rgs_no_header}
+        sed 's/CB:Z:/RG:Z:tso_/g' | samtools view -h -Sb >  {output.with_rgs_no_header}
 
         ## get the old bam header
         samtools view -H {input.without_rgs} > {output.header}
@@ -317,62 +322,193 @@ rule add_readgroups_to_bam:
 
         while read -r barcode
         do
-           # echo "@RG${{TAB}}ID:wta_${{barcode}}"
-           echo "@RG${{TAB}}ID:tso_${{barcode}}"
+        # echo "@RG${{TAB}}ID:wta_${{barcode}}"
+        echo "@RG${{TAB}}ID:tso_${{barcode}}"
 
         done < {input.filtered_barcodes} > {output.header_barcodes}
 
         samtools view {output.with_rgs_no_header} | \
-          cat {output.header} {output.header_barcodes} - | \
-          samtools view -Sb -@ {threads} | \
-          samtools sort -@ {threads}  > {output.with_rgs}
+        cat {output.header} {output.header_barcodes} - | \
+        samtools view -Sb -@ {threads} | \
+        samtools sort -@ {threads}  > {output.with_rgs}
+            """
 
-        """
+    rule:
+        name:
+            'count_custom_regions_no_module'
+        conda:
+            op.join('envs', 'all_in_one.yaml')
+        input:
+            bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}_rg.bam'),
+            gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
+        output:
+            fc = op.join(config['working_dir'], 'multimodal', '{sample}', '{modality}_featurecounted')
+        threads: min(64, config['nthreads']) # featurecounts has a max 64 for -T
+        resources:
+             mem_mb=config['max_mem_mb']
+        log: op.join(config['working_dir'], 'multimodal', '{sample}', '{modality}_featurecounts.log')
+        params:
+            featureCounts = config['featureCounts'],
+            run_mode = config['run_mode'],
+            overallconfig = 'config.yaml',
+            max_mem = lambda wildcards, resources: resources.mem_mb * 1024,
+            t = config['featurecounts_t'],
+            g = config['featurecounts_g']
+        shell:
+            """
+            run_mode="{params.run_mode}"
+    
+            if [ "$run_mode" = "all" ] || [ "$run_mode" = "tso ontarget multi" ]
+            then
+                ulimit -v {params.max_mem}
+                
+                ## featurecounts, notice the -M and -T and --fraction
+                {params.featureCounts} \
+                     -a {input.gtf} \
+                     -o {output.fc} \
+                     {input.bam} \
+                     -F GTF \
+                     -t {params.t} \
+                     -g {params.g} \
+                     -f \
+                     -O \
+                     -M  \
+                     -T {threads} \
+                     --fraction \
+                     --byReadGroup &> {log}
+            fi
+            """
+    ## by chrom
+    rule:
+        name:
+            'split_by_chr'
+        conda:
+            op.join('envs', 'all_in_one.yaml')
+        input:
+            bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
+            bai = op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                          'Aligned.sortedByCoord.out.bam.bai'),
+            valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+                                     'filtered', 'barcodes.tsv')
+        output:
+            mini = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                '{chrom}_subset.bam'))
+        threads: min(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
+        shell:
+            """
+            samtools view -h -b {input.bam} {wildcards.chrom} > {output.mini}      
+            """
 
-rule count_custom_regions_no_module:
-    conda:
-        op.join('envs', 'all_in_one.yaml')
-    input:
-        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'subset_{modality}_rg.bam'),
-        gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
-    output:
-        fc = op.join(config['working_dir'], 'multimodal', '{sample}', '{modality}_featurecounted')
-    threads: min(64, config['nthreads']) # featurecounts has a max 64 for -T
-    resources:
-         mem_mb=config['max_mem_mb']
-    log: op.join(config['working_dir'], 'multimodal', '{sample}', '{modality}_featurecounts.log')
-    params:
-        featureCounts = config['featureCounts'],
-        run_mode = config['run_mode'],
-        overallconfig = 'config.yaml',
-        max_mem = lambda wildcards, resources: resources.mem_mb * 1024,
-        t = config['featurecounts_t'],
-        g = config['featurecounts_g']
-    shell:
-        """
-        run_mode={params.run_mode}
 
-        if [ "$run_mode" = "all" ] || [ "$run_mode" = "tso_ontarget_multi" ]
-        then
-            ulimit -v {params.max_mem}
+    rule:
+        name:
+            'dedup_by_cb_umi_and_gx_and_start'
+        conda:
+            op.join('envs', 'all_in_one.yaml')
+        input:
+            mini = op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                '{chrom}_subset.bam'),
+            chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
+        output:
+            cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                '{chrom}_cb_umi_deduped.bam')),
+            header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                '{chrom}_cb_umi_deduped_header.txt'))
+        threads: min(10, int(-(-workflow.cores * 0.1 // 1))) # workaround to reduce IO bottleneck (uses `ceil`)
+        shell:
+            """
+            samtools view -H {input.mini} > {output.header}
+    
+            ## this breaks because of the interleaved tags
+            # 4 start (SAM POS) needed to avoid losing the second monomer in tdtomato (warning dirty CB/UMI dedup!)
+            # 20 gx (gene id)
+            # 27 CB (error corrected CB)
+            # 28 UB (error corrected UMI)
+            # the chromosome is implicit - from the per-chr run
+            # samtools view {input.mini} |  sort -k4 -k27 -k28 -k20 -u | cat {output.header} - | \
+            #    samtools view -Sbh > {output.cb_ub_bam}  
+    
+            ## this is a rather dirty fix to reorder SAM TAGs (by position) so the sort -u works as expected
+            # 4 start (SAM POS) needed to avoid losing the second monomer in tdtomato (warning dirty CB/UMI dedup!)
+            # 20 gx (gene id)
+            # 27 CB (error corrected CB)
+            # 28 UB (error corrected UMI)
+            # the chromosome is implicit - from the per-chr run
+            samtools view -@ {threads} {input.mini} | \
+                   ##  yes POS ($4) is repeated, and it's unorthodox to have it somewhere not in 4
+                   awk 'OFS=FS="\\t" {{print $1,  $2,  $3,  $4,  $5,  $6,  $7,  $8,  $9,  $10, 
+                                             $11, $12, $13, $14, $15, $16, $17, $18, $19, 
+                                             $21, $22, $23, $24, $25, $26, 
+                                             $28, $27, $20, $4}}' | \
+                   sort -k26 -k27 -k28 -k29 -u | \
+                   ## so it's removed after the sorting
+                   cut -f1-28 | \
+                   cat {output.header} - | \
+                   samtools view -@ {threads} -Sbh > {output.cb_ub_bam} 
+    
+            """
+    
+    rule:
+        name:
+            'merge_deduped_bams'
+        conda:
+            op.join('envs', 'all_in_one.yaml')
+        input:
+            bams = lambda wildcards: [op.join(config['working_dir'], 'align_{modality}', '{sample}', x) for x in list_by_chr_dedup_bams(wildcards)]
+        output:
+            unsorted = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
+                                    'cb_ub_filt_unsorted.bam')),
+            merged = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam'))
+        threads:
+            config['nthreads']
+        shell:
+            """
+            samtools merge -@ {threads} -o {output.unsorted} {input.bams}
+            samtools sort -@ {threads} {output.unsorted} -o {output.merged}
+    
+            """
+    
+    rule:
+        name:
+            'create_deduped_coverage_tracks_all_filtered_in_cbs'
+        conda:
+            op.join('envs', 'all_in_one.yaml')
+        input:
+            bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam'),
+            valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+                                     'filtered', 'barcodes.tsv'),
+            chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
+        threads:
+            config['nthreads']
+        params:
+            binSize = 10,
+            bedtools = config['bedtools'],
+            bedGraphToBigWig = config['bedGraphToBigWig']        
+        output:
+            cb_ub_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt_twice.bam'),
+            bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
+            cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt_twice.bw'))
+        shell:
+            """
+            ## this is unrelated to the bamgeneration; fixes starsolo's default permissions
+            chmod -R ug+rwX $(dirname {input.bam})
+    
+            ## first filter in 'valid' CBs
+    
+            ## CB are the error-corrected barcodes
+            samtools view -h -@ {threads} {input.bam} -D CB:{input.valid_barcodes} \
+               -o {output.cb_ub_bam}
             
-            ## featurecounts, notice the -M and -T and --fraction
-            {params.featureCounts} \
-                 -a {input.gtf} \
-                 -o {output.fc} \
-                 {input.bam} \
-                 -F GTF \
-                 -t {params.t} \
-                 -g {params.g} \
-                 -f \
-                 -O \
-                 -M  \
-                 -T {threads} \
-                 --fraction \
-                 --byReadGroup &> {log}
-        fi
-        """
-        
+            samtools index -@ {threads} {output.cb_ub_bam}
+    
+            {params.bedtools} genomecov -ibam {output.cb_ub_bam} \
+                -bg -split | LC_COLLATE=C sort -k1,1 -k2,2n > {output.cb_ub_bg}
+    
+            ## bedgraph to bigwig
+            {params.bedGraphToBigWig} {output.cb_ub_bg} {input.chromsizes} {output.bw}
+            
+            """
+            
 checkpoint retrieve_genome_sizes:
     conda:
         op.join('envs', 'all_in_one.yaml')
@@ -386,6 +522,38 @@ checkpoint retrieve_genome_sizes:
         """
         {params.faSize} -detailed -tab {input.fa} > {output}
         """
+
+if config['run_mode'] in ['all', 'tso ontarget multi']:
+    checkpoint ready_for_sce:
+        conda:
+            op.join('envs', 'all_in_one.yaml')
+        input:
+            tso_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'tso_featurecounted'),
+            wta_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'wta_featurecounted'),
+            bw_tso = op.join(config['working_dir'], 'align_tso', '{sample}', '{sample}_tso_coverage.bw'),
+            bw_wta = op.join(config['working_dir'], 'align_wta', '{sample}', '{sample}_wta_coverage.bw')
+        output:
+            temp('ready_{sample}')
+        shell:
+           """
+           touch {output}
+           """
+
+elif config['run_mode'] == 'tso off- and ontarget unique':
+    checkpoint ready_for_sce:
+        conda:
+            op.join('envs', 'all_in_one.yaml')
+        input:
+            wta_flag = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
+                               'filtered', 'barcodes.tsv'),
+            tso_flag = op.join(config['working_dir'], 'align_tso', '{sample}', 'Aligned.sortedByCoord.out.bam')
+        output:
+            temp('ready_{sample}')
+        shell:
+           """
+           touch {output}
+           """
+
 
 rule index_bam:
     conda:
@@ -401,250 +569,6 @@ rule index_bam:
         samtools index -@ {threads} {input.bam}     
         """
         
-## by chrom
-rule split_by_chr:
-    conda:
-        op.join('envs', 'all_in_one.yaml')
-    input:
-        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-        bai = op.join(config['working_dir'], 'align_{modality}', '{sample}',
-                      'Aligned.sortedByCoord.out.bam.bai'),
-        valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
-                                 'filtered', 'barcodes.tsv')
-    output:
-        mini = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-                            '{chrom}_subset.bam'))
-    threads: min(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
-    shell:
-        """
-        samtools view -h -b {input.bam} {wildcards.chrom} > {output.mini}      
-        """
-
-# ## by chrom
-# rule dedup_by_cb_umi_gx:
-#     conda:
-#         op.join('envs', 'all_in_one.yaml')
-#     input:
-#         mini = op.join(config['working_dir'], 'align_{modality}', '{sample}',
-#                             '{chrom}_subset.bam'),
-#         chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
-#     output:
-#         cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-#                             '{chrom}_cb_umi_deduped.bam')),
-#         header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-#                             '{chrom}_cb_umi_deduped_header.txt'))
-#     threads: min(10, workflow.cores * 0.1) # workaround to reduce IO bottleneck
-#     shell:
-#         """
-#         samtools view -H {input.mini} > {output.header}
-
-#         # 20 gx (gene id)
-#         # 27 CB (error corrected CB)
-#         # 28 UB (error corrected UMI)
-#         # the chromosome is implicit - from the per-chr run
-#         samtools view [input.mini] |  sort -k27 -k28 -k 20 -u | cat [output.header] - | \
-#            samtools view -Sbh > [output.cb_ub_bam]  
-
-#         """
-
-rule dedup_by_cb_umi_and_gx_and_start:
-    conda:
-        op.join('envs', 'all_in_one.yaml')
-    input:
-        mini = op.join(config['working_dir'], 'align_{modality}', '{sample}',
-                            '{chrom}_subset.bam'),
-        chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
-    output:
-        cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-                            '{chrom}_cb_umi_deduped.bam')),
-        header = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-                            '{chrom}_cb_umi_deduped_header.txt'))
-    threads: min(10, int(-(-workflow.cores * 0.1 // 1))) # workaround to reduce IO bottleneck (uses `ceil`)
-    shell:
-        """
-        samtools view -H {input.mini} > {output.header}
-
-        ## this breaks because of the interleaved tags
-        # 4 start (SAM POS) needed to avoid losing the second monomer in tdtomato (warning dirty CB/UMI dedup!)
-        # 20 gx (gene id)
-        # 27 CB (error corrected CB)
-        # 28 UB (error corrected UMI)
-        # the chromosome is implicit - from the per-chr run
-        # samtools view {input.mini} |  sort -k4 -k27 -k28 -k20 -u | cat {output.header} - | \
-        #    samtools view -Sbh > {output.cb_ub_bam}  
-
-        ## this is a rather dirty fix to reorder SAM TAGs (by position) so the sort -u works as expected
-        # 4 start (SAM POS) needed to avoid losing the second monomer in tdtomato (warning dirty CB/UMI dedup!)
-        # 20 gx (gene id)
-        # 27 CB (error corrected CB)
-        # 28 UB (error corrected UMI)
-        # the chromosome is implicit - from the per-chr run
-        samtools view -@ {threads} {input.mini} | \
-               ##  yes POS ($4) is repeated, and it's unorthodox to have it somewhere not in 4
-               awk 'OFS=FS="\\t" {{print $1,  $2,  $3,  $4,  $5,  $6,  $7,  $8,  $9,  $10, 
-                                         $11, $12, $13, $14, $15, $16, $17, $18, $19, 
-                                         $21, $22, $23, $24, $25, $26, 
-                                         $28, $27, $20, $4}}' | \
-               sort -k26 -k27 -k28 -k29 -u | \
-               ## so it's removed after the sorting
-               cut -f1-28 | \
-               cat {output.header} - | \
-               samtools view -@ {threads} -Sbh > {output.cb_ub_bam} 
-
-        """
-
-rule merge_deduped_bams:
-    conda:
-        op.join('envs', 'all_in_one.yaml')
-    input:
-        bams = lambda wildcards: [op.join(config['working_dir'], 'align_{modality}', '{sample}', x) for x in list_by_chr_dedup_bams(wildcards)]
-    output:
-        unsorted = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-                                'cb_ub_filt_unsorted.bam')),
-        merged = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam'))
-    threads:
-        config['nthreads']
-    shell:
-        """
-        samtools merge -@ {threads} -o {output.unsorted} {input.bams}
-        samtools sort -@ {threads} {output.unsorted} -o {output.merged}
-
-        """
-
-rule create_deduped_coverage_tracks_all_filtered_in_cbs:
-    conda:
-        op.join('envs', 'all_in_one.yaml')
-    input:
-        bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam'),
-        valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
-                                 'filtered', 'barcodes.tsv'),
-        chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
-    threads:
-        config['nthreads']
-    params:
-        binSize = 10,
-        bedtools = config['bedtools'],
-        bedGraphToBigWig = config['bedGraphToBigWig']        
-    output:
-        cb_ub_bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt_twice.bam'),
-        bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw'),
-        cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt_twice.bw'))
-    shell:
-        """
-        ## this is unrelated to the bamgeneration; fixes starsolo's default permissions
-        chmod -R ug+rwX $(dirname {input.bam})
-
-        ## first filter in 'valid' CBs
-
-        ## CB are the error-corrected barcodes
-        samtools view -h -@ {threads} {input.bam} -D CB:{input.valid_barcodes} \
-           -o {output.cb_ub_bam}
-        
-        samtools index -@ {threads} {output.cb_ub_bam}
-
-        {params.bedtools} genomecov -ibam {output.cb_ub_bam} \
-            -bg -split | LC_COLLATE=C sort -k1,1 -k2,2n > {output.cb_ub_bg}
-
-        ## bedgraph to bigwig
-        {params.bedGraphToBigWig} {output.cb_ub_bg} {input.chromsizes} {output.bw}
-        
-        """
-        
-# rule create_deduped_coverage_tracks_all_filtered_in_cbs:
-#     conda:
-#         op.join('envs', 'all_in_one.yaml')
-#     input:
-#         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-#         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
-#                                  'filtered', 'barcodes.tsv'),
-#         chromsizes = op.join(config['working_dir'], 'data', 'chrom.sizes')
-#     threads:
-#         config['nthreads']
-#     params:
-#         # bamCoverage = config['bamCoverage'],
-#         binSize = 10,
-#         bedtools = config['bedtools'],
-#         bedGraphToBigWig = config['bedGraphToBigWig']        
-#     output:
-#         cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_filt.bam')),
-#         cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bam')),
-#         header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'header')),
-#         cb_ub_bg = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_ub_filt.bw')),
-#         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_{modality}_coverage.bw')
-#     shell:
-#         """
-#         ## this is unrelated to the bamgeneration; fixes starsolo's default permissions
-#         chmod -R ug+rwX $(dirname {input.bam})
-
-#         ## first filter in 'valid' CBs
-
-#         ## CB are the error-corrected barcodes
-#         samtools view -h -@ {threads} {input.bam} -D CB:{input.valid_barcodes} \
-#            -o {output.cb_bam}
-
-#         ## second, deduplicate by UB (error corrected barcodes)
-#         ##  so it gets only one alignment per UB:locus:CB combination
-#         # 27 CB (error corrected CB)
-#         # 28 UB (error corrected UMI)
-#         # mind the file is coordinate sorted already - so we deduplicate based on columns 27 and 28
-#         samtools view -H {output.cb_bam} > {output.header}
-
-#         samtools view {output.cb_bam} -@ {threads} | uniq -f26 | cat {output.header} - | \
-#           samtools view -Sb -@ {threads} > {output.cb_ub_bam}
-
-#         samtools index -@ {threads} {output.cb_ub_bam}
-
-#         {params.bedtools} genomecov -ibam {output.cb_ub_bam} \
-#             -bg -split | LC_COLLATE=C sort -k1,1 -k2,2n > {output.cb_ub_bg}
-
-#         ## bedgraph to bigwig
-#         {params.bedGraphToBigWig} {output.cb_ub_bg} {input.chromsizes} {output.bw}
-        
-#         """
-
-# rule create_deduped_coverage_tracks_single_cb:
-#     conda:
-#        op.join('envs', 'all_in_one.yaml')
-#    input:
-#         bam = op.join(config['working_dir'], 'align_{modality}', '{sample}', 'Aligned.sortedByCoord.out.bam'),
-#         valid_barcodes = op.join(config['working_dir'], 'align_wta', '{sample}', 'Solo.out', 'Gene',
-#                                  'filtered', 'barcodes.tsv')
-#     threads:
-#         config['nthreads']
-#     params:
-#         bamCoverage = config['bamCoverage'],
-#         binSize = 10
-#     output:
-#         cb_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', 'cb_{cell}_filt.bam')),
-#         cb_ub_bam = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}',
-#                                  'cb_{cell}_ub_filt.bam')),
-#         header  = temp(op.join(config['working_dir'], 'align_{modality}', '{sample}', '{cell}_header')),
-#         bw = op.join(config['working_dir'], 'align_{modality}', '{sample}', '{sample}_cb_{cell}_coverage.bw')
-#     shell:
-#         """
-#         ## first filter in the query CB
-#         samtools view -h -@ {threads} {input.bam} -d CB:{wildcards.cell} \
-#            -o {output.cb_bam}
-
-#         ## second, deduplicate by UB (error corrected barcodes)
-#         ##  so it gets only one alignment per UB:locus:CB combination
-#         # 27 CB (error corrected CB; the only CB being queried)
-#         # 28 UB (error corrected UMI)
-#         # mind the file is coordinate sorted already - so we deduplicate based on columns 27 and 28
-#         samtools view -H {output.cb_bam} > {output.header}
-
-#         samtools view -h {output.cb_bam} -@ {threads} | uniq -f26 | cat {output.header} - | \
-#           samtools view -Sb -@ {threads} > {output.cb_ub_bam}
-
-#         samtools index -@ {threads} {output.cb_ub_bam}
-
-#         # deeptools coverage it, no normalization
-#         {params.bamCoverage} --numberOfProcessors {threads} \
-#           -b {output.cb_ub_bam} \
-#           --normalizeUsing None \
-#           -o {output.bw} --binSize {params.binSize}
-        
-#         """
 
 ## yes the log is considered an output - to pass as a flag
 ## R_LIBS are conda's if run in conda, but /home/rock/R_LIBs if run in docker, and user's if run directly
@@ -668,17 +592,20 @@ rule install_r_deps:
         {params.Rbin} -q --no-save --no-restore --slave \
              -f {input.script} &> {output.log}
         """
-        
-rule generate_sce:
+
+rule generate_sce_multi_all:
     conda:
         op.join('envs', 'all_in_one.yaml')
     input:
-        tso_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'tso_featurecounted'),
-        wta_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'wta_featurecounted'),
+        # tso_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'tso_featurecounted'),
+        # wta_fc = op.join(config['working_dir'], 'multimodal', '{sample}', 'wta_featurecounted'),
+        flag = 'ready_{sample}',
         gtf = config['gtf'],
         script = op.join(config['rock_method_path'], 'src', 'generate_sce_object.R'),
         installs = op.join(config['working_dir'], 'log', 'installs.log'),
         subset_gtf = op.join(config['working_dir'], 'multimodal', 'subset.gtf')
+    log:
+        op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.log')
     output:
         sce = op.join(config['working_dir'], 'multimodal', '{sample}', '{sample}_sce.rds')
     params:
@@ -699,10 +626,10 @@ rule generate_sce:
         mkdir -p {params.multimodal_path} 
         {params.Rbin} -q --no-save --no-restore --slave \
              -f {input.script} --args --sample {wildcards.sample} \
-             --run_mode {params.run_mode} \
+             --run_mode '{params.run_mode}' \
              --working_dir {params.working_dir} \
              --output_fn {output.sce} \
-             --captured_gtf {input.subset_gtf}
+             --captured_gtf {input.subset_gtf} &> {log}
         """
 
 
@@ -775,5 +702,4 @@ rule generate_mapping_report:
         else
             echo "no report - that just just a simulation; but SCE objects are ready" > {output.summary}
         fi
-
         """
