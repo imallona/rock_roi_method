@@ -6,6 +6,10 @@ This repository includes a Snakemake workflow to automate data processing from r
 
 If you are planning to analyze BD Rhapsody data without RoCK nor RoCK+ROI, that is, just WTA plus sample tags, you might want to check https://github.com/imallona/rhapsodist (under development) instead.
 
+# Preprint
+
+- [RoCK and ROI: Single-cell transcriptomics with multiplexed enrichment of selected transcripts and region-specific sequencing](https://www.biorxiv.org/content/10.1101/2024.05.18.594120v2) (2024)
+  
 # Components
 
 To analyze their data, users need to provide their sequencing files in fastq format (one for the cell barcode plus UMI; and another for the cDNA) and a configuration file specifying the experiment characteristics and extra information, including:
