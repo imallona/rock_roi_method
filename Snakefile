@@ -582,7 +582,7 @@ rule install_r_deps:
     params:
         run_mode = config['run_mode'],
         working_dir = config['working_dir'],
-        sample = "{wildcards.sample}",
+        # sample = "{wildcards.sample}",
         Rbin = config['Rbin'],
         log_path = op.join(config['working_dir'], 'log')
     shell:
@@ -612,7 +612,7 @@ rule generate_sce_multi_all:
         multimodal_path = op.join(config['working_dir'], 'multimodal'),
         run_mode = config['run_mode'],
         working_dir = config['working_dir'],
-        sample = "{wildcards.sample}",
+        sample = get_sample_names(),
         Rbin = config['Rbin']
     # run:
     #     if params.run_mode in ['all', 'tso ontarget multi']:
@@ -652,7 +652,7 @@ rule render_descriptive_report:
         multimodal_path = op.join(config['working_dir'], 'multimodal'),
         run_mode = config['run_mode'],
         working_dir = config['working_dir'],
-        sample = "{wildcards.sample}",
+        sample = get_sample_names(),
         Rbin = config['Rbin'],
         simulate = config['simulate']
     shell:
