@@ -27,3 +27,4 @@ dependencies:
   - bioconda::bioconductor-scater=1.26.0
   - conda-forge::r-seurat=4.4.0
   - conda-forge::r-seuratobject=5.0.0
+  - conda-forge::r-argparse

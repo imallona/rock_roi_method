@@ -1,54 +1,41 @@
-## simulate: True generates fake data and runs the pipeline
 simulate: True
 
-## software stack, will work out of the box if within the supplied docker container
 Rbin: R
 STAR: STAR
-# bamCoverage: bamCoverage ## not used anymore
 featureCounts: featureCounts
 bedtools: bedtools
 bedGraphToBigWig: bedGraphToBigWig
 faSize: faSize
-
-## run limits
 nthreads: 2
-max_mem_mb: 20000 ## these are megabytes
+max_mem_mb: 20000
 
-## full or relative path to the `root` of the rock_roi_method cloned repository
+## mind to update this to the full or relative path the git repo is cloned to
 rock_method_path: "."
 
-## full or relative path where outputs will be generated at
 working_dir: work
 
-## fill below these line if `simulate : False` -----------------------------------------
-## if `simulate: True` then all config below this line will be replaced by
-##   hardcoded values (within the Snakefile)
-
-gtf: work/data/genome.gtf
-genome: work/data/genome.fa
+gtf: genome.gtf
+genome: genome.fa
 
 # i.e. cDNA read length minus 1
-sjdbOverhang: 100
+sjdbOverhang: 149
 
 ## run mode, one of these (please see the README / docs):
 ##   'tso off- and ontarget unique'
 ##   'tso ontarget_multi'
 ##   'all'
-run_mode: 'tso ontarget multi'
+run_mode: 'tso off- and ontarget unique'
 
 ## GTF `source` field identifying on-target rock- or roi- features
 capture_gtf_column_2_pattern : 'captured'
 featurecounts_t: 'exon' ## feature counting unit for featurecounts
 featurecounts_g: 'gene_id' ## feature grouping unit for featurecounts
 
+## these are not used by the simulations, but must be updated with
+##   the experimental design for sequenced data
 samples:
-  - name: simulated
+  - name: simul
     uses:
-      cb_umi_fq: work/data/simulated/r1.fq.gz
-      cdna_fq: work/data/simulated/r2.fq.gz
-      whitelist: 96x3
-  - name: simulated2
-    uses:
-      cb_umi_fq: work/data/simulated/r1.fq.gz
-      cdna_fq: work/data/simulated/r2.fq.gz
-      whitelist: 96x3
+      cb_umi_fq: empty_r1.fq.gz
+      cdna_fq: empty_r2.fq.gz
+      whitelist: 384x3  ## so full CB allowedlist
