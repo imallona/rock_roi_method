@@ -249,7 +249,7 @@ for (id in unique(colData(sce)$experiment)) {
 
 ## Quick clustering (WTA) {.tabset .tabset-pills}
 
-```{r}
+```{r, results = 'asis'}
 
 if (params$run_mode != "all") {
   cat('**This report is only available for runmode "all". Exiting early after failing to render this chunk.**\n')
