@@ -657,21 +657,26 @@ rule render_descriptive_report:
         simulate = config['simulate']
     shell:
         """
+        mkdir -p {params.multimodal_path}
         simulate={params.simulate}
 
         if [ "$simulate" = "False" ]
         then
 
-        {params.Rbin} --vanilla -e 'rmarkdown::render(\"{input.script}\", 
-          output_file = \"{output.html}\", 
-          params = list(multimodal_path = \"{params.multimodal_path}\", 
-                        run_mode = \"{params.run_mode}\"))' &> {log}
-        else
-          echo "no report - that just just a simulation; but SCE objects are ready" > {output.html}
-          # touch [output.cache]          
-          # touch [output.cached_files]
-        fi
+          cd {params.working_dir}/..
+          cp {input.script} report.Rmd
+       
+          {params.Rbin} --vanilla -e 'rmarkdown::render("report.Rmd",
+            output_file = "report.html",
+            params = list(multimodal_path = \"{params.multimodal_path}\", run_mode = \"{params.run_mode}\"))' &> {log}
 
+          mv report.html {output.html}
+          rm report.Rmd
+        else
+            echo "no report - that just just a simulation; but SCE objects are ready" > {output.html}
+            # touch [output.cache]          
+            # touch [output.cached_files]
+        fi
         """
 
 rule generate_mapping_report:

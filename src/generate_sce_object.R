@@ -37,6 +37,8 @@ args <- parser$parse_args()
 
 get_captured_gene_ids <- function(gtf) {
     fd <- read.table(gtf, sep = '\t')
+    if (ncol(fd) == 1)
+        stop('Wrong GTF format')
     return(sapply(strsplit(fd$V9, split = ';'), function(x) return(gsub('gene_id ', '', x[1]))))
 }
 
