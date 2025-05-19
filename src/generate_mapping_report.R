@@ -49,17 +49,19 @@ names(tso) <- samples
 
 wta_fc_fns <- list.files(file.path(p, 'multimodal'), pattern =  'tso_featurecounted.summary', recursive = TRUE)
 
-wta_fc <- lapply(wta_fc_fns, function(x) read.table(file.path(p, 'multimodal', x),
+if (length(wta_fc_fns) > 0) {
+    wta_fc <- lapply(wta_fc_fns, function(x) read.table(file.path(p, 'multimodal', x),
                                                     header = TRUE, row.names = 1))
-names(wta_fc) <- dirname(wta_fc_fns)
-
+    names(wta_fc) <- dirname(wta_fc_fns)
+}
 
 tso_fc_fns <- list.files(file.path(p, 'multimodal'), pattern =  'tso_featurecounted.summary', recursive = TRUE)
 
-tso_fc <- lapply(tso_fc_fns, function(x) read.table(file.path(p, 'multimodal', x),
+if (length(tso_fc_fns) > 0) {
+    tso_fc <- lapply(tso_fc_fns, function(x) read.table(file.path(p, 'multimodal', x),
                                                     header = TRUE, row.names = 1))
-
 names(tso_fc) <- dirname(tso_fc_fns)
+}
 
 ## assemble (rather dirty...)
 
@@ -71,27 +73,29 @@ for (sample in samples) {
 
     cat('\n\n## STARsolo summary - TSO modality\n')
     print(tso[[sample]])
-    
-    cat('\n\n## Custom counting summary - WTA modality\n')
-    cat('### Number of features\n')
-    nrow(wta_fc)
-    cat('### Alignment counting summary\n')
-    print(apply(wta_fc[[sample]], 1, sum))
-    cat('### Number of features\n')
-    nrow(wta_fc[[sample]])
-    cat('### Number of cells with at least one read assigned\n')   
-    sum(wta_fc[[sample]]['Assigned',] > 0)
 
-    cat('\n\n## Custom counting summary - TSO modality\n')
-    cat('### Number of features\n')
-    nrow(tso_fc)
-    cat('### Alignment counting summary\n')
-    print(apply(tso_fc[[sample]], 1, sum))
-    cat('### Number of features\n')
-    nrow(tso_fc[[sample]])
-    cat('### Number of cells with at least one read assigned\n')   
-    print(sum(tso_fc[[sample]]['Assigned',] > 0))
+    if (length(wta_fc_fns) > 0) {
+        cat('\n\n## Custom counting summary - WTA modality\n')
+        cat('### Number of features\n')
+        nrow(wta_fc)
+        cat('### Alignment counting summary\n')
+        print(apply(wta_fc[[sample]], 1, sum))
+        cat('### Number of features\n')
+        nrow(wta_fc[[sample]])
+        cat('### Number of cells with at least one read assigned\n')   
+        sum(wta_fc[[sample]]['Assigned',] > 0)
+    }
 
+    if (length(tso_fc_fns) > 0) {
+        cat('\n\n## Custom counting summary - TSO modality\n')
+        cat('### Number of features\n')
+        nrow(tso_fc)
+        cat('### Alignment counting summary\n')
+        print(apply(tso_fc[[sample]], 1, sum))
+        cat('### Number of features\n')
+        nrow(tso_fc[[sample]])
+        cat('### Number of cells with at least one read assigned\n')   
+        print(sum(tso_fc[[sample]]['Assigned',] > 0))
+    }
     cat('\n\n')
 }
-
