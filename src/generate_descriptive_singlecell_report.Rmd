@@ -19,6 +19,8 @@ params:
 
 
 ```{r}
+getwd()
+
 suppressPackageStartupMessages({
     library(SingleCellExperiment)
     library(Seurat)
@@ -59,24 +61,24 @@ knitr::opts_chunk$set(fig.width = 5,
                       warning = TRUE,
                       message = TRUE)
 
-## ## render on error hook
-## knitr::knit_hooks$set(error = function(x, options) {
-##     ## if (exists(x)) {
-##     ##     cat(str(x))
-##     ## }
+## render on error hook
+knitr::knit_hooks$set(error = function(x, options) {
+ if (exists(x)) {
+     cat(str(x))
+ }
+ knitr::knit_exit()
+})
 
-##     knitr::knit_exit()
-## })
-  
 ```
 
 ```{r}
-
-## dp <- "/home/imallona/ebrunner_spectral/mixing_mouse_genome_only/multimodal_nidhi/"
 dp <- params$multimodal_path
+
 sces <- lapply(list.files(dp,
                           ".*sce.rds", recursive = TRUE),
                function(x) readRDS(file.path(dp, x)))
+
+print(sces)
 
 ## combine sces
 ## sce <-  Reduce(cbind, sces)
@@ -247,7 +249,12 @@ for (id in unique(colData(sce)$experiment)) {
 
 ## Quick clustering (WTA) {.tabset .tabset-pills}
 
-```{r}
+```{r, results = 'asis'}
+
+if (params$run_mode != "all") {
+  cat('**This report is only available for runmode "all". Exiting early after failing to render this chunk.**\n')
+}  
+
 meta <- as.data.frame(t(assay(altExp(sce, 'tso_ontarget_multi'))))[rownames(colData(sce)),]
 colnames(meta) <- paste0('captured_', colnames(meta))
 
