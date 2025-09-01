@@ -1,15 +1,29 @@
 # Aim
 
-This repository belongs to the rock and roi project from the University of Zurich. You might want to browse https://github.com/imallona/rock_roi_paper too.
+This repository belongs to the rock and roi project from the University of Zurich. You might want to browse [the supplementary code too](https://github.com/imallona/rock_roi_paper).
 
 This repository includes a Snakemake workflow to automate data processing from raw reads to count tables (and R `singleCellExperiment` objects) listing both on-target TSO and off-target WTA readouts. The software stack needed to run the method is containerized using Docker.
 
-If you are planning to analyze BD Rhapsody data without RoCK nor RoCK+ROI, that is, just WTA plus sample tags, you might want to check https://github.com/imallona/rhapsodist (under development) instead.
+If you are planning to analyze BD Rhapsody data without RoCK nor RoCK+ROI, that is, just WTA plus sample tags, you might want to check [rhapsodist](https://github.com/imallona/rhapsodist) (under development) instead.
+
+You might also want to keep an eye on our issues and pull requests.
 
 # Preprint
 
 - [RoCK and ROI: Single-cell transcriptomics with multiplexed enrichment of selected transcripts and region-specific sequencing](https://www.biorxiv.org/content/10.1101/2024.05.18.594120v2) (2024)
-  
+
+# License
+
+[GPLv3](https://en.wikipedia.org/wiki/GNU_General_Public_License) by Izaskun Mallona.
+
+# TL/DR sequencing reads layout
+
+What does RoCK + ROI produce after sequencing?
+
+<p align="center">
+  <img src="docs/reads_layout.png" alt="layout" style="width:100%;">
+</p>
+
 # Components
 
 To analyze their data, users need to provide their sequencing files in fastq format (one for the cell barcode plus UMI; and another for the cDNA) and a configuration file specifying the experiment characteristics and extra information, including:
@@ -255,14 +269,17 @@ ontarget        captured        exon    1030    1090    .       +       .       
 
 Then, edit the `config.yaml` file so the `capture_gtf_column_2_pattern` reads `captured`.
 
-# License
-
-GPLv3
-
 # Extra reading
 
-- https://github.com/imallona/rock_roi_paper Actual analysis using this method
-- (deprecated) https://gitlab.uzh.ch/izaskun.mallona/ebrunner_spectral
+- [Preprint figures/analysis code](https://github.com/imallona/rock_roi_paper)
+- [Deprecated repository](https://gitlab.uzh.ch/izaskun.mallona/ebrunner_spectral) or [mirror](https://github.com/imallona/ebrunner_spectral)
+- [Chimeric reads debugging](https://github.com/imallona/rock_roi_debug) (perhaps private)
+
+Plus several Zenado snapshots of these, including:
+
+- [This repository on Zenodo](https://zenodo.org/records/11070201)
+- [Preprint figures/analysis/code on Zenodo](https://zenodo.org/records/14881175)
+
 
 ## Contributors
 
